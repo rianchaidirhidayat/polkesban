@@ -189,7 +189,7 @@ export const PublicMicrosite: React.FC<PublicMicrositeProps> = ({
           <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/40 border border-white/10 backdrop-blur-md text-[11px] text-neutral-300 font-medium">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping inline-block mr-0.5" />
             <span className="w-2 h-2 rounded-full bg-emerald-500 absolute" />
-            Portal Layanan Karyawan
+            {profile.footerBadgeText ? profile.footerBadgeText.split('•')[0].trim() : 'Portal Layanan Pegawai'}
           </div>
 
           <div className="flex items-center gap-2">
@@ -468,10 +468,18 @@ export const PublicMicrosite: React.FC<PublicMicrositeProps> = ({
 
         {/* Footer info */}
         <div className="mt-10 mb-6 text-center space-y-2">
-          <div className="inline-flex items-center gap-1.5 text-xs text-neutral-400">
-            <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Portal Resmi Karyawan • Akses Terenkripsi & Terverifikasi</span>
-          </div>
+          {profile.footerBadgeText !== '' && (
+            <div className="inline-flex items-center gap-1.5 text-xs text-neutral-400">
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+              <span>{profile.footerBadgeText || 'Portal Resmi Pegawai • Akses Terenkripsi & Terverifikasi'}</span>
+            </div>
+          )}
+
+          {profile.footerText && (
+            <p className="text-xs text-neutral-400 max-w-sm mx-auto">
+              {profile.footerText}
+            </p>
+          )}
 
           {onOpenAdmin && (
             <div className="pt-2">
@@ -487,7 +495,7 @@ export const PublicMicrosite: React.FC<PublicMicrositeProps> = ({
           )}
 
           <p className="text-[10px] text-neutral-400">
-            {profile.name} © {new Date().getFullYear()} • Portal Layanan Internal Perusahaan
+            {profile.name} © {new Date().getFullYear()} • {profile.footerCopyright || 'Portal Layanan Internal Pegawai'}
           </p>
         </div>
       </div>

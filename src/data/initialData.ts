@@ -74,7 +74,7 @@ export const THEME_PRESETS: ThemeConfig[] = [
 ];
 
 export const INITIAL_PROFILE: MicrositeProfile = {
-  name: 'Portal Layanan Pegawai & Karyawan',
+  name: 'Portal Layanan Pegawai',
   tagline: 'Pusat Akses Layanan Internal, HRIS & Fasilitas Pegawai',
   bio: 'Portal satu pintu bagi seluruh pegawai untuk akses cepat presensi online, e-slip gaji, pengajuan cuti & lembur, klaim asuransi, SOP kerja, serta helpdesk IT & HR.',
   avatarUrl: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=400&auto=format&fit=crop&q=80',
@@ -92,6 +92,8 @@ export const INITIAL_PROFILE: MicrositeProfile = {
     { id: '4', platform: 'website', url: 'https://intranet.perusahaan.internal', label: 'Intranet Kantor', isActive: true },
     { id: '5', platform: 'maps', url: 'https://maps.google.com/?q=Jakarta', label: 'Lokasi Kantor Pusat', isActive: true }
   ],
+  footerBadgeText: 'Portal Resmi Pegawai • Akses Terenkripsi & Terverifikasi',
+  footerCopyright: 'Portal Layanan Internal Pegawai',
   theme: THEME_PRESETS[0]
 };
 
@@ -122,7 +124,7 @@ export const INITIAL_MENUS: MenuItem[] = [
   },
   {
     id: 'menu-2',
-    title: '📄 Slip Gaji & Rekap Insentif Karyawan',
+    title: '📄 Slip Gaji & Rekap Insentif Pegawai',
     subtitle: 'Unduh e-slip gaji bulanan, rincian potongan BPJS, bonus & PPh 21',
     url: 'https://payroll.perusahaan.internal/slip-gaji',
     type: 'link',
@@ -218,9 +220,9 @@ export const INITIAL_MENUS: MenuItem[] = [
   },
   {
     id: 'menu-6',
-    title: '📚 SOP, Regulasi & Pedoman Kerja Karyawan',
+    title: '📚 SOP, Regulasi & Pedoman Kerja Pegawai',
     subtitle: 'Buku saku tata tertib kerja, kode etik perusahaan, panduan K3 & KPI',
-    url: 'https://drive.perusahaan.internal/sop-karyawan.pdf',
+    url: 'https://drive.perusahaan.internal/sop-pegawai.pdf',
     type: 'catalog',
     size: 'medium',
     bgColor: '#1e293b',
@@ -262,7 +264,7 @@ export const INITIAL_MENUS: MenuItem[] = [
   {
     id: 'menu-8',
     title: '🎓 Portal E-Learning & Sertifikasi Internal',
-    subtitle: 'Modul pelatihan kompetensi karyawan, onboarding & tes penilaian',
+    subtitle: 'Modul pelatihan kompetensi pegawai, onboarding & tes penilaian',
     url: 'https://learn.perusahaan.internal',
     type: 'link',
     size: 'compact',
@@ -313,7 +315,7 @@ export const INITIAL_CLICK_LOGS: ClickLog[] = [
   {
     id: 'log-2',
     menuId: 'menu-2',
-    menuTitle: '📄 Slip Gaji & Rekap Insentif Karyawan',
+    menuTitle: '📄 Slip Gaji & Rekap Insentif Pegawai',
     category: 'Kesejahteraan & Benefit',
     timestamp: new Date(Date.now() - 1000 * 60 * 12).toISOString(),
     device: 'Desktop',
@@ -353,7 +355,7 @@ export const INITIAL_CLICK_LOGS: ClickLog[] = [
   {
     id: 'log-6',
     menuId: 'menu-6',
-    menuTitle: '📚 SOP, Regulasi & Pedoman Kerja Karyawan',
+    menuTitle: '📚 SOP, Regulasi & Pedoman Kerja Pegawai',
     category: 'Dokumen & SOP',
     timestamp: new Date(Date.now() - 1000 * 60 * 120).toISOString(),
     device: 'Tablet',

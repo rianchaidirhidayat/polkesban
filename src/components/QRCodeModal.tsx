@@ -77,7 +77,7 @@ export const QRCodeModal: React.FC<QRCodeModalProps> = ({
               Bagikan Akses Portal Pegawai
             </h3>
             <p className="text-xs text-slate-500 mt-1">
-              Scan barcode QR untuk langsung membuka portal layanan karyawan tanpa instalasi aplikasi
+              Scan barcode QR untuk langsung membuka portal layanan pegawai tanpa instalasi aplikasi
             </p>
           </div>
 

@@ -525,7 +525,7 @@ export default function App() {
                 <div className="flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
                   <span className="font-semibold text-white">Mode Tampilan Resmi Pegawai (Live)</span>
-                  <span className="text-[11px] text-indigo-200 hidden sm:inline">— Ini adalah tampilan yang dilihat oleh seluruh karyawan</span>
+                  <span className="text-[11px] text-indigo-200 hidden sm:inline">— Ini adalah tampilan yang dilihat oleh seluruh pegawai</span>
                 </div>
                 <button
                   onClick={() => setCurrentView('admin')}

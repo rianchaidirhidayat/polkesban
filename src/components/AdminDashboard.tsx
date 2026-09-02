@@ -40,6 +40,13 @@ import {
   LogOut,
   Send,
   CheckCheck,
+  Phone,
+  Mail,
+  Globe,
+  MessageCircle,
+  MapPin,
+  AlignLeft,
+  FileSignature,
 } from 'lucide-react';
 import { MenuItem, MicrositeProfile, ClickLog, ButtonSize, ThemeConfig } from '../types';
 import { THEME_PRESETS, CATEGORIES_PRESET } from '../data/initialData';
@@ -295,7 +302,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             <button
               onClick={onPublish}
               disabled={isPublishing}
-              title="Publikasikan semua perubahan menu & tema agar langsung berubah di tampilan karyawan"
+              title="Publikasikan semua perubahan menu & tema agar langsung berubah di tampilan pegawai"
               className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-md bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold shadow-sm transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-75"
             >
               {isPublishing ? (
@@ -1334,6 +1341,261 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     </div>
                   </div>
                 </div>
+
+                {/* Footer Customization */}
+                <div className="p-6 bg-white border border-slate-200 rounded-xl space-y-5 shadow-xs">
+                  <div className="flex items-center gap-3 pb-3 border-b border-slate-100">
+                    <div className="p-2 rounded-lg bg-indigo-50 text-indigo-600 border border-indigo-100">
+                      <FileSignature className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-bold text-slate-900 tracking-tight">
+                        Pengaturan Teks & Lencana Footer
+                      </h3>
+                      <p className="text-xs text-slate-500">
+                        Sesuaikan tulisan keamanan, hak cipta, dan catatan resmi yang tampil di bagian bawah portal
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1.5 flex items-center justify-between">
+                        <span>Teks Lencana Keamanan / Status (Badge Atas Footer)</span>
+                        <span className="text-[10px] text-slate-400 font-normal">Kosongkan jika ingin disembunyikan</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={profile.footerBadgeText || ''}
+                        placeholder="Contoh: Portal Resmi Pegawai • Akses Terenkripsi & Terverifikasi"
+                        onChange={(e) => {
+                          setProfile({ ...profile, footerBadgeText: e.target.value });
+                          triggerSaveFeedback();
+                        }}
+                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm text-slate-900 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 placeholder-slate-400"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1.5 flex items-center justify-between">
+                        <span>Catatan Tambahan Footer (Deskripsi / SOP Singkat)</span>
+                        <span className="text-[10px] text-slate-400 font-normal">Opsional</span>
+                      </label>
+                      <textarea
+                        rows={2}
+                        value={profile.footerText || ''}
+                        placeholder="Contoh: Gunakan jaringan intranet kantor atau VPN perusahaan saat mengakses database sensitif."
+                        onChange={(e) => {
+                          setProfile({ ...profile, footerText: e.target.value });
+                          triggerSaveFeedback();
+                        }}
+                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm text-slate-900 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 placeholder-slate-400"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                        Teks Hak Cipta & Kepemilikan (Copyright)
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-slate-500 font-medium px-2 py-2 bg-slate-100 rounded-lg border border-slate-200 whitespace-nowrap">
+                          {profile.name} © {new Date().getFullYear()} •
+                        </span>
+                        <input
+                          type="text"
+                          value={profile.footerCopyright || ''}
+                          placeholder="Contoh: Portal Layanan Internal Pegawai"
+                          onChange={(e) => {
+                            setProfile({ ...profile, footerCopyright: e.target.value });
+                            triggerSaveFeedback();
+                          }}
+                          className="flex-1 px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm text-slate-900 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 placeholder-slate-400"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Social & Contact Links Management */}
+                <div className="p-6 bg-white border border-slate-200 rounded-xl space-y-5 shadow-xs">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <div className="p-1.5 rounded-lg bg-indigo-50 text-indigo-600 border border-indigo-100">
+                          <Globe className="w-4 h-4" />
+                        </div>
+                        <h3 className="text-sm font-bold text-slate-900 tracking-tight">
+                          Kontak Cepat & Media Sosial (Pesan, Email, Telepon, Internet, Lokasi)
+                        </h3>
+                      </div>
+                      <p className="text-xs text-slate-500 mt-1">
+                        Atur ikon tombol pintas kontak cepat yang tampil di header profil publik. Anda dapat menambah, mengubah, mengaktifkan/menonaktifkan, atau menghapus tautan kontak.
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const newId = `social-${Date.now()}`;
+                        const newSocial = {
+                          id: newId,
+                          platform: 'whatsapp' as const,
+                          label: 'WhatsApp Admin',
+                          url: 'https://wa.me/6281234567890',
+                          isActive: true,
+                        };
+                        setProfile({
+                          ...profile,
+                          socialLinks: [...(profile.socialLinks || []), newSocial],
+                        });
+                        triggerSaveFeedback();
+                      }}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition-all shadow-xs shrink-0 self-start sm:self-auto"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Tambah Kontak</span>
+                    </button>
+                  </div>
+
+                  {(!profile.socialLinks || profile.socialLinks.length === 0) ? (
+                    <div className="text-center py-6 border-2 border-dashed border-slate-200 rounded-xl bg-slate-50">
+                      <Globe className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                      <p className="text-xs text-slate-500 font-medium">Belum ada ikon kontak cepat.</p>
+                      <p className="text-[11px] text-slate-400 mt-0.5">Klik tombol &quot;Tambah Kontak&quot; di atas untuk menambahkan pesan WhatsApp, email, telepon, internet/website, atau Google Maps.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {profile.socialLinks.map((social, index) => (
+                        <div
+                          key={social.id || index}
+                          className={`p-3.5 rounded-xl border transition-all ${
+                            social.isActive
+                              ? 'bg-slate-50/80 border-slate-200'
+                              : 'bg-slate-100/50 border-slate-200/60 opacity-60'
+                          }`}
+                        >
+                          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                            {/* Platform selector with icon preview */}
+                            <div className="w-full sm:w-44 shrink-0">
+                              <label className="block text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
+                                Jenis / Tipe Kontak
+                              </label>
+                              <select
+                                value={social.platform}
+                                onChange={(e) => {
+                                  const updated = (profile.socialLinks || []).map((s, i) =>
+                                    i === index ? { ...s, platform: e.target.value as any } : s
+                                  );
+                                  setProfile({ ...profile, socialLinks: updated });
+                                  triggerSaveFeedback();
+                                }}
+                                className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-800 focus:outline-none focus:border-indigo-500"
+                              >
+                                <option value="whatsapp">💬 Pesan (WhatsApp / Chat)</option>
+                                <option value="email">✉️ Email (Surel)</option>
+                                <option value="phone">📞 Telepon / Hotline</option>
+                                <option value="website">🌐 Internet / Website</option>
+                                <option value="maps">📍 Lokasi (Google Maps)</option>
+                                <option value="instagram">📸 Instagram</option>
+                                <option value="youtube">🎥 YouTube</option>
+                                <option value="tiktok">🎵 TikTok</option>
+                                <option value="facebook">👥 Facebook</option>
+                                <option value="twitter">🐦 Twitter / X</option>
+                              </select>
+                            </div>
+
+                            {/* Label */}
+                            <div className="w-full sm:w-44 shrink-0">
+                              <label className="block text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
+                                Label / Judul
+                              </label>
+                              <input
+                                type="text"
+                                value={social.label}
+                                placeholder="Contoh: WhatsApp HRD"
+                                onChange={(e) => {
+                                  const updated = (profile.socialLinks || []).map((s, i) =>
+                                    i === index ? { ...s, label: e.target.value } : s
+                                  );
+                                  setProfile({ ...profile, socialLinks: updated });
+                                  triggerSaveFeedback();
+                                }}
+                                className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-800 focus:outline-none focus:border-indigo-500"
+                              />
+                            </div>
+
+                            {/* URL */}
+                            <div className="flex-1">
+                              <label className="block text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
+                                Tautan URL / Nomor / Alamat
+                              </label>
+                              <input
+                                type="text"
+                                value={social.url}
+                                placeholder={
+                                  social.platform === 'whatsapp'
+                                    ? 'https://wa.me/6281234567890'
+                                    : social.platform === 'email'
+                                    ? 'mailto:helpdesk@perusahaan.co.id'
+                                    : social.platform === 'phone'
+                                    ? 'tel:0211234567'
+                                    : social.platform === 'maps'
+                                    ? 'https://maps.google.com/...'
+                                    : 'https://...'
+                                }
+                                onChange={(e) => {
+                                  const updated = (profile.socialLinks || []).map((s, i) =>
+                                    i === index ? { ...s, url: e.target.value } : s
+                                  );
+                                  setProfile({ ...profile, socialLinks: updated });
+                                  triggerSaveFeedback();
+                                }}
+                                className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-mono text-slate-800 focus:outline-none focus:border-indigo-500"
+                              />
+                            </div>
+
+                            {/* Action Buttons: Toggle Active & Delete */}
+                            <div className="flex items-center gap-1.5 pt-4 sm:pt-4 self-end sm:self-center shrink-0">
+                              <button
+                                type="button"
+                                title={social.isActive ? 'Nonaktifkan' : 'Aktifkan'}
+                                onClick={() => {
+                                  const updated = (profile.socialLinks || []).map((s, i) =>
+                                    i === index ? { ...s, isActive: !s.isActive } : s
+                                  );
+                                  setProfile({ ...profile, socialLinks: updated });
+                                  triggerSaveFeedback();
+                                }}
+                                className={`p-1.5 rounded-lg border transition-all ${
+                                  social.isActive
+                                    ? 'bg-emerald-50 text-emerald-600 border-emerald-200 hover:bg-emerald-100'
+                                    : 'bg-slate-200 text-slate-500 border-slate-300 hover:bg-slate-300'
+                                }`}
+                              >
+                                {social.isActive ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+                              </button>
+
+                              <button
+                                type="button"
+                                title="Hapus Kontak"
+                                onClick={() => {
+                                  if (window.confirm(`Hapus kontak "${social.label}"?`)) {
+                                    const updated = (profile.socialLinks || []).filter((_, i) => i !== index);
+                                    setProfile({ ...profile, socialLinks: updated });
+                                    triggerSaveFeedback();
+                                  }
+                                }}
+                                className="p-1.5 rounded-lg bg-rose-50 text-rose-600 border border-rose-200 hover:bg-rose-100 transition-all"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 
@@ -1541,7 +1803,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         <span>Halaman Pegawai (Publik): Terisolasi Aman</span>
                       </div>
                       <p className="text-[11px] text-emerald-700 leading-relaxed">
-                        Saat tautan portal dibuka oleh karyawan biasa, mereka hanya melihat katalog menu layanan tanpa bilah navigasi admin atau kontrol pengeditan.
+                        Saat tautan portal dibuka oleh pegawai biasa, mereka hanya melihat katalog menu layanan tanpa bilah navigasi admin atau kontrol pengeditan.
                       </p>
                     </div>
 

@@ -86,6 +86,9 @@ export interface MicrositeProfile {
   location: string;
   openingHours?: string;
   socialLinks: SocialLink[];
+  footerText?: string;
+  footerBadgeText?: string;
+  footerCopyright?: string;
   theme: ThemeConfig;
 }
 

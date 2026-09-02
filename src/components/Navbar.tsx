@@ -51,7 +51,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               <span>Panel Admin</span>
               <span className="text-slate-400 font-normal hidden md:inline">• {profile.name}</span>
             </h1>
-            <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold rounded flex items-center gap-1" title="Tersinkronisasi ke Cloud Firestore: Setiap klik Posting akan langsung tayang di semua HP/perangkat karyawan secara otomatis">
+            <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold rounded flex items-center gap-1" title="Tersinkronisasi ke Cloud Firestore: Setiap klik Posting akan langsung tayang di semua HP/perangkat pegawai secara otomatis">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
               <span>Cloud Realtime Sync</span>
             </span>
