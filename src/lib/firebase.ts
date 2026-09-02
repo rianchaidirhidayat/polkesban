@@ -7,12 +7,15 @@ import {
   onSnapshot, 
   collection, 
   addDoc, 
+  query,
+  orderBy,
+  limit,
   serverTimestamp,
   Firestore
 } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 import { MenuItem, MicrositeProfile, ClickLog } from '../types';
-import { INITIAL_MENUS, INITIAL_PROFILE } from '../data/initialData';
+import { INITIAL_MENUS, INITIAL_PROFILE, INITIAL_CLICK_LOGS } from '../data/initialData';
 
 // Initialize Firebase App
 const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
@@ -33,6 +36,8 @@ try {
 export const db = firestoreInstance;
 
 const LIVE_PORTAL_DOC = 'live';
+const SECURITY_DOC = 'security';
+const DRAFT_DOC = 'draft';
 
 export interface LivePortalData {
   menus: MenuItem[];
@@ -86,6 +91,7 @@ export async function publishLivePortalToCloud(
 ): Promise<{ success: boolean; timestamp: string; error?: string }> {
   try {
     const docRef = doc(db, 'portal', LIVE_PORTAL_DOC);
+    const draftRef = doc(db, 'settings', DRAFT_DOC);
     const now = new Date().toISOString();
     
     const cleanMenus = sanitizeForFirestore(menus);
@@ -98,7 +104,16 @@ export async function publishLivePortalToCloud(
       updatedAt: serverTimestamp(),
     };
 
-    await setDoc(docRef, payload);
+    // Save to live portal doc and also sync draft doc
+    await Promise.all([
+      setDoc(docRef, payload),
+      setDoc(draftRef, {
+        menus: cleanMenus,
+        profile: cleanProfile,
+        updatedAt: serverTimestamp(),
+      })
+    ]);
+
     return { success: true, timestamp: now };
   } catch (err: any) {
     console.error('Failed to write portal to Cloud Firestore:', err);
@@ -107,6 +122,102 @@ export async function publishLivePortalToCloud(
       timestamp: new Date().toISOString(), 
       error: err?.message || 'Gagal menyimpan ke server database cloud' 
     };
+  }
+}
+
+/**
+ * Subscribe to Admin Security (PIN) in Cloud Firestore
+ * Ensures that PIN changed on one device will automatically apply to all browsers/devices.
+ */
+export function subscribeToAdminSecurity(
+  onPinUpdate: (pin: string) => void,
+  onError?: (error: any) => void
+) {
+  const docRef = doc(db, 'settings', SECURITY_DOC);
+
+  return onSnapshot(
+    docRef,
+    (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.data();
+        if (data && typeof data.pin === 'string' && data.pin.trim().length > 0) {
+          onPinUpdate(data.pin.trim());
+        }
+      }
+    },
+    (err) => {
+      console.warn('Firestore security subscription error:', err);
+      if (onError) onError(err);
+    }
+  );
+}
+
+/**
+ * Save new Admin PIN to Cloud Firestore
+ */
+export async function saveAdminPinToCloud(newPin: string): Promise<boolean> {
+  try {
+    const docRef = doc(db, 'settings', SECURITY_DOC);
+    await setDoc(docRef, {
+      pin: newPin.trim(),
+      updatedAt: serverTimestamp(),
+    });
+    return true;
+  } catch (err) {
+    console.error('Failed to save Admin PIN to Cloud Firestore:', err);
+    return false;
+  }
+}
+
+/**
+ * Subscribe to Admin Draft in Cloud Firestore so any admin edits are synced across devices
+ */
+export function subscribeToAdminDraft(
+  onDraftUpdate: (data: { menus: MenuItem[]; profile: MicrositeProfile }) => void,
+  onError?: (error: any) => void
+) {
+  const docRef = doc(db, 'settings', DRAFT_DOC);
+
+  return onSnapshot(
+    docRef,
+    (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.data();
+        if (data && Array.isArray(data.menus) && data.profile) {
+          onDraftUpdate({
+            menus: data.menus,
+            profile: data.profile,
+          });
+        }
+      }
+    },
+    (err) => {
+      console.warn('Firestore draft subscription error:', err);
+      if (onError) onError(err);
+    }
+  );
+}
+
+/**
+ * Save draft edits to Cloud Firestore
+ */
+export async function saveAdminDraftToCloud(
+  menus: MenuItem[],
+  profile: MicrositeProfile
+): Promise<boolean> {
+  try {
+    const docRef = doc(db, 'settings', DRAFT_DOC);
+    const cleanMenus = sanitizeForFirestore(menus);
+    const cleanProfile = sanitizeForFirestore(profile);
+    await setDoc(docRef, {
+      menus: cleanMenus,
+      profile: cleanProfile,
+      updatedAt: serverTimestamp(),
+    });
+    return true;
+  } catch (e) {
+    console.warn('Failed to save draft to cloud:', e);
+    return false;
   }
 }
 
@@ -123,6 +234,51 @@ export async function logClickToCloud(log: ClickLog): Promise<void> {
     });
   } catch (e) {
     console.warn('Failed to log click to cloud:', e);
+  }
+}
+
+/**
+ * Subscribe to Click Logs from Cloud Firestore for real-time analytics
+ */
+export function subscribeToClickLogs(
+  onLogsUpdate: (logs: ClickLog[]) => void,
+  onError?: (error: any) => void
+) {
+  try {
+    const logsCol = collection(db, 'click_logs');
+    const q = query(logsCol, orderBy('timestamp', 'desc'), limit(150));
+    
+    return onSnapshot(
+      q,
+      (snapshot) => {
+        const cloudLogs: ClickLog[] = [];
+        snapshot.forEach((docSnap) => {
+          const data = docSnap.data();
+          if (data && data.menuId && data.timestamp) {
+            cloudLogs.push({
+              id: docSnap.id,
+              menuId: data.menuId,
+              menuTitle: data.menuTitle || '',
+              category: data.category || 'Umum',
+              timestamp: data.timestamp,
+              device: data.device || 'Mobile',
+              browser: data.browser || 'Browser',
+              referrer: data.referrer || 'Direct / QR',
+            });
+          }
+        });
+        if (cloudLogs.length > 0) {
+          onLogsUpdate(cloudLogs);
+        }
+      },
+      (err) => {
+        console.warn('Firestore click_logs subscription error:', err);
+        if (onError) onError(err);
+      }
+    );
+  } catch (e) {
+    console.warn('Failed to setup click_logs query:', e);
+    return () => {};
   }
 }
 

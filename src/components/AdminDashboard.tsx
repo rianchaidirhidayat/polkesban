@@ -1642,7 +1642,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     {pinChangeSuccess && (
                       <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-xs font-medium text-emerald-800 flex items-center gap-2">
                         <Check className="w-4 h-4 text-emerald-600 shrink-0" />
-                        <span>PIN Admin berhasil diperbarui! Jangan lupa catat PIN baru Anda.</span>
+                        <span>PIN Admin berhasil diperbarui dan disinkronkan ke Cloud Database Firebase! Berlaku otomatis di semua perangkat dan browser.</span>
                       </div>
                     )}
 

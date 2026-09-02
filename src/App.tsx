@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Navbar } from './components/Navbar';
 import { PublicMicrosite } from './components/PublicMicrosite';
 import { AdminDashboard } from './components/AdminDashboard';
@@ -8,7 +8,16 @@ import { MenuItem, MicrositeProfile, ClickLog } from './types';
 import { INITIAL_MENUS, INITIAL_PROFILE, INITIAL_CLICK_LOGS } from './data/initialData';
 import { motion, AnimatePresence } from 'motion/react';
 import { CheckCheck, Sparkles, Send, Cloud, CloudCheck, Wifi } from 'lucide-react';
-import { subscribeToLivePortal, publishLivePortalToCloud, logClickToCloud } from './lib/firebase';
+import { 
+  subscribeToLivePortal, 
+  publishLivePortalToCloud, 
+  logClickToCloud,
+  subscribeToAdminSecurity,
+  saveAdminPinToCloud,
+  subscribeToAdminDraft,
+  saveAdminDraftToCloud,
+  subscribeToClickLogs
+} from './lib/firebase';
 
 const LOCAL_STORAGE_MENUS_KEY = 'direct_menu_items_v2';
 const LOCAL_STORAGE_PROFILE_KEY = 'direct_menu_profile_v2';
@@ -23,6 +32,7 @@ const LOCAL_STORAGE_LAST_PUBLISHED_KEY = 'direct_menu_last_published_v2';
 
 export default function App() {
   const [isCloudSynced, setIsCloudSynced] = useState(false);
+  const isInitialDraftLoadedFromCloudRef = useRef(false);
 
   // Load initial draft states (Admin working copy)
   const [menus, setMenus] = useState<MenuItem[]>(() => {
@@ -88,29 +98,6 @@ export default function App() {
     cloudSynced: boolean;
   } | null>(null);
 
-  // Real-time Cloud Sync Subscription across all devices
-  useEffect(() => {
-    const unsubscribe = subscribeToLivePortal(
-      (cloudData) => {
-        if (cloudData && Array.isArray(cloudData.menus) && cloudData.profile) {
-          setLiveMenus(cloudData.menus);
-          setLiveProfile(cloudData.profile);
-          if (cloudData.lastPublishedAt) {
-            setLastPublishedAt(cloudData.lastPublishedAt);
-          }
-          setIsCloudSynced(true);
-        }
-      },
-      (err) => {
-        console.warn('Firestore subscription status:', err);
-      }
-    );
-
-    return () => {
-      unsubscribe();
-    };
-  }, []);
-
   const [logs, setLogs] = useState<ClickLog[]>(() => {
     try {
       const saved = localStorage.getItem(LOCAL_STORAGE_LOGS_KEY);
@@ -130,6 +117,84 @@ export default function App() {
     }
     return 'admin123';
   });
+
+  // 1. Real-time Cloud Sync for Live Portal across all devices
+  useEffect(() => {
+    const unsubscribe = subscribeToLivePortal(
+      (cloudData) => {
+        if (cloudData && Array.isArray(cloudData.menus) && cloudData.profile) {
+          setLiveMenus(cloudData.menus);
+          setLiveProfile(cloudData.profile);
+          if (cloudData.lastPublishedAt) {
+            setLastPublishedAt(cloudData.lastPublishedAt);
+          }
+          setIsCloudSynced(true);
+
+          // If this device / browser hasn't loaded cloud data yet or opened fresh:
+          if (!isInitialDraftLoadedFromCloudRef.current) {
+            setMenus(cloudData.menus);
+            setProfile(cloudData.profile);
+            isInitialDraftLoadedFromCloudRef.current = true;
+          }
+        }
+      },
+      (err) => {
+        console.warn('Firestore subscription status:', err);
+      }
+    );
+
+    return () => {
+      unsubscribe();
+    };
+  }, []);
+
+  // 2. Real-time Cloud Sync for Admin PIN across all devices/browsers
+  useEffect(() => {
+    const unsubscribe = subscribeToAdminSecurity((cloudPin) => {
+      if (cloudPin && typeof cloudPin === 'string') {
+        setAdminPin(cloudPin);
+        try {
+          localStorage.setItem(LOCAL_STORAGE_ADMIN_PIN_KEY, cloudPin);
+        } catch {
+          // ignore
+        }
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, []);
+
+  // 3. Real-time Cloud Sync for Admin Draft (work-in-progress)
+  useEffect(() => {
+    const unsubscribe = subscribeToAdminDraft((draftData) => {
+      if (draftData && Array.isArray(draftData.menus) && draftData.profile) {
+        if (!isInitialDraftLoadedFromCloudRef.current) {
+          setMenus(draftData.menus);
+          setProfile(draftData.profile);
+          isInitialDraftLoadedFromCloudRef.current = true;
+        }
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, []);
+
+  // 4. Real-time Cloud Sync for Click Logs / Analytics
+  useEffect(() => {
+    const unsubscribe = subscribeToClickLogs((cloudLogs) => {
+      if (Array.isArray(cloudLogs) && cloudLogs.length > 0) {
+        setLogs(cloudLogs);
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, []);
 
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState<boolean>(() => {
     try {
@@ -212,17 +277,17 @@ export default function App() {
     }
   }, [adminPin]);
 
-  useEffect(() => {
+  // Handler for Admin PIN change (syncs to Cloud Firestore & LocalStorage)
+  const handleUpdateAdminPin = async (newPin: string) => {
+    const cleanPin = newPin.trim();
+    setAdminPin(cleanPin);
     try {
-      if (isAdminAuthenticated) {
-        sessionStorage.setItem(SESSION_ADMIN_AUTH_KEY, 'true');
-      } else {
-        sessionStorage.removeItem(SESSION_ADMIN_AUTH_KEY);
-      }
-    } catch {
-      // ignore
+      localStorage.setItem(LOCAL_STORAGE_ADMIN_PIN_KEY, cleanPin);
+      await saveAdminPinToCloud(cleanPin);
+    } catch (e) {
+      console.warn('Failed to sync PIN to cloud:', e);
     }
-  }, [isAdminAuthenticated]);
+  };
 
   // Handle URL parameters or Hash (#admin or ?admin=true) & Keyboard shortcut Alt+A
   useEffect(() => {
@@ -502,7 +567,7 @@ export default function App() {
             onSimulateClick={handleSimulateClick}
             onClearLogs={handleClearLogs}
             adminPin={adminPin}
-            setAdminPin={setAdminPin}
+            setAdminPin={handleUpdateAdminPin}
             onLogout={handleAdminLogout}
             onPublish={handlePublishLive}
             isPublishing={isPublishing}
@@ -527,7 +592,7 @@ export default function App() {
                 onSimulateClick={handleSimulateClick}
                 onClearLogs={handleClearLogs}
                 adminPin={adminPin}
-                setAdminPin={setAdminPin}
+                setAdminPin={handleUpdateAdminPin}
                 onLogout={handleAdminLogout}
                 onPublish={handlePublishLive}
                 isPublishing={isPublishing}
