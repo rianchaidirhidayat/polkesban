@@ -1,0 +1,50 @@
+{
+  "entities": {
+    "LivePortal": {
+      "title": "LivePortal",
+      "description": "Publicly published microsite menus and company profile",
+      "type": "object",
+      "properties": {
+        "menus": {
+          "type": "array",
+          "description": "List of active published menu items"
+        },
+        "profile": {
+          "type": "object",
+          "description": "Microsite profile metadata and styling"
+        },
+        "lastPublishedAt": {
+          "type": "string",
+          "description": "ISO timestamp of last publish"
+        }
+      },
+      "required": ["menus", "profile"]
+    },
+    "ClickLog": {
+      "title": "ClickLog",
+      "description": "Analytics click log for menu items",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "menuId": { "type": "string" },
+        "menuTitle": { "type": "string" },
+        "category": { "type": "string" },
+        "timestamp": { "type": "string" },
+        "device": { "type": "string" },
+        "browser": { "type": "string" },
+        "referrer": { "type": "string" }
+      },
+      "required": ["id", "menuId", "menuTitle", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/portal/live": {
+      "schema": "LivePortal",
+      "description": "Live published portal state synced across all devices"
+    },
+    "/click_logs/{logId}": {
+      "schema": "ClickLog",
+      "description": "Click event logs"
+    }
+  }
+}

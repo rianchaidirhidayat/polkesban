@@ -1,0 +1,22 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Portal configuration (live published menus and profile)
+    match /portal/{docId} {
+      allow read: if true;
+      allow write: if true;
+    }
+    
+    // Click analytics logs
+    match /click_logs/{logId} {
+      allow read: if true;
+      allow create: if true;
+      allow update, delete: if true;
+    }
+    
+    // Admin settings / PIN hash
+    match /settings/{docId} {
+      allow read, write: if true;
+    }
+  }
+}

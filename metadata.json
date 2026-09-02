@@ -1,0 +1,8 @@
+{
+  "name": "Direct Menu Microsite & Admin",
+  "description": "Portal layanan direct menu internal pegawai dengan dashboard admin real-time, kustomisasi ukuran tombol, drag-and-drop tata letak, analitik klik, dan ekspor laporan CSV/PDF.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

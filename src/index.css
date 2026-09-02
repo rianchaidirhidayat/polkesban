@@ -1,0 +1,46 @@
+@import "tailwindcss";
+
+@layer utilities {
+  .bg-dot-pattern {
+    background-image: radial-gradient(#0f172a 1px, transparent 1px);
+    background-size: 20px 20px;
+  }
+  .bg-dot-pattern-light {
+    background-image: radial-gradient(#94a3b8 1px, transparent 1px);
+    background-size: 20px 20px;
+  }
+}
+
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+/* Hide scrollbar for Chrome, Safari and Opera */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Hide scrollbar for IE, Edge and Firefox */
+.no-scrollbar {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+
+/* Custom sleek scrollbar for dashboard */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
