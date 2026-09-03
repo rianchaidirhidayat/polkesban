@@ -277,6 +277,44 @@ export default function App() {
     }
   }, [adminPin]);
 
+  // Dynamic Browser Tab Title and Favicon Management
+  useEffect(() => {
+    const activeProf = currentView === 'admin' ? profile : liveProfile;
+    const baseTitle = (activeProf.tabTitle && activeProf.tabTitle.trim())
+      ? activeProf.tabTitle.trim()
+      : (activeProf.name || 'Portal Layanan Pegawai');
+
+    document.title = currentView === 'admin' ? `Admin Panel • ${baseTitle}` : baseTitle;
+
+    // Favicon Link in DOM
+    let link = document.querySelector("link[rel~='icon']") as HTMLLinkElement | null;
+    if (!link) {
+      link = document.createElement('link');
+      link.rel = 'icon';
+      document.head.appendChild(link);
+    }
+
+    const customFavicon = activeProf.faviconUrl?.trim();
+    if (customFavicon) {
+      link.href = customFavicon;
+    } else if (activeProf.avatarUrl?.trim()) {
+      link.href = activeProf.avatarUrl.trim();
+    } else {
+      // Default SVG favicon
+      link.href = "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏢</text></svg>";
+    }
+  }, [
+    currentView,
+    profile.tabTitle,
+    profile.name,
+    profile.faviconUrl,
+    profile.avatarUrl,
+    liveProfile.tabTitle,
+    liveProfile.name,
+    liveProfile.faviconUrl,
+    liveProfile.avatarUrl
+  ]);
+
   // Handler for Admin PIN change (syncs to Cloud Firestore & LocalStorage)
   const handleUpdateAdminPin = async (newPin: string) => {
     const cleanPin = newPin.trim();

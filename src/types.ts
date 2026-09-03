@@ -89,6 +89,8 @@ export interface MicrositeProfile {
   footerText?: string;
   footerBadgeText?: string;
   footerCopyright?: string;
+  tabTitle?: string;
+  faviconUrl?: string;
   theme: ThemeConfig;
 }
 

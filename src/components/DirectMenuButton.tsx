@@ -158,10 +158,10 @@ export const DirectMenuButton: React.FC<DirectMenuButtonProps> = ({
             className={`
               ${sizeStyle.iconBox}
               flex items-center justify-center rounded-xl bg-black/20 backdrop-blur-xs
-              border border-white/10 transition-transform group-hover:scale-110 shrink-0
+              border border-white/10 transition-transform group-hover:scale-110 shrink-0 overflow-hidden p-1
             `}
           >
-            {getIconComponent(menu.iconName, 'w-5 h-5')}
+            {getIconComponent(menu.iconName, 'w-full h-full max-w-[28px] max-h-[28px]')}
           </div>
 
           {/* Text Details */}

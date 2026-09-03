@@ -94,6 +94,8 @@ export const INITIAL_PROFILE: MicrositeProfile = {
   ],
   footerBadgeText: 'Portal Resmi Pegawai • Akses Terenkripsi & Terverifikasi',
   footerCopyright: 'Portal Layanan Internal Pegawai',
+  tabTitle: 'Portal Layanan Pegawai',
+  faviconUrl: '',
   theme: THEME_PRESETS[0]
 };
 
