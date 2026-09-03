@@ -55,6 +55,7 @@ import { AdminMenuEditorModal } from './AdminMenuEditorModal';
 import { AnalyticsView } from './AnalyticsView';
 import { PublicMicrosite } from './PublicMicrosite';
 import { exportToCSV, exportToPDF } from '../utils/exportUtils';
+import { optimizeImageForStorage } from '../utils/imageOptimizer';
 
 interface AdminDashboardProps {
   menus: MenuItem[];
@@ -112,22 +113,33 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const availableCategories = CATEGORIES_PRESET;
 
   // File Upload Helper
-  const handleLocalImageUpload = (
+  const handleLocalImageUpload = async (
     file: File,
-    onSuccess: (dataUrl: string) => void
+    onSuccess: (dataUrl: string) => void,
+    maxWidth = 280,
+    maxHeight = 280
   ) => {
     if (!file.type.startsWith('image/')) {
       alert('Harap unggah file gambar (PNG, JPG, WebP, SVG)');
       return;
     }
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      if (e.target?.result) {
-        onSuccess(e.target.result as string);
+    try {
+      const optimized = await optimizeImageForStorage(file, maxWidth, maxHeight, 0.85);
+      if (optimized) {
+        onSuccess(optimized);
         triggerSaveFeedback();
       }
-    };
-    reader.readAsDataURL(file);
+    } catch (err) {
+      console.warn('Image optimization error:', err);
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        if (e.target?.result) {
+          onSuccess(e.target.result as string);
+          triggerSaveFeedback();
+        }
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   // Handlers for Menu Management

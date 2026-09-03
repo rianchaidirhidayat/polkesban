@@ -16,6 +16,7 @@ import {
 import firebaseConfig from '../../firebase-applet-config.json';
 import { MenuItem, MicrositeProfile, ClickLog } from '../types';
 import { INITIAL_MENUS, INITIAL_PROFILE, INITIAL_CLICK_LOGS } from '../data/initialData';
+import { optimizeImageForStorage } from '../utils/imageOptimizer';
 
 // Initialize Firebase App
 const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
@@ -83,6 +84,46 @@ export function subscribeToLivePortal(
 }
 
 /**
+ * Helper to downscale and optimize heavy base64 images inside menus and profile
+ */
+async function optimizePortalPayload(menus: MenuItem[], profile: MicrositeProfile) {
+  const optimizedMenus = await Promise.all(
+    menus.map(async (m) => {
+      let iconName = m.iconName;
+      if (iconName && (iconName.startsWith('data:image/') || iconName.startsWith('blob:'))) {
+        iconName = await optimizeImageForStorage(iconName, 160, 160, 0.85);
+      }
+      return {
+        ...m,
+        iconName,
+      };
+    })
+  );
+
+  const optimizedProfile = { ...profile };
+  if (optimizedProfile.avatarUrl && (optimizedProfile.avatarUrl.startsWith('data:image/') || optimizedProfile.avatarUrl.startsWith('blob:'))) {
+    optimizedProfile.avatarUrl = await optimizeImageForStorage(optimizedProfile.avatarUrl, 280, 280, 0.85);
+  }
+  if (optimizedProfile.faviconUrl && (optimizedProfile.faviconUrl.startsWith('data:image/') || optimizedProfile.faviconUrl.startsWith('blob:'))) {
+    optimizedProfile.faviconUrl = await optimizeImageForStorage(optimizedProfile.faviconUrl, 96, 96, 0.85);
+  }
+  if (optimizedProfile.coverUrl && (optimizedProfile.coverUrl.startsWith('data:image/') || optimizedProfile.coverUrl.startsWith('blob:'))) {
+    optimizedProfile.coverUrl = await optimizeImageForStorage(optimizedProfile.coverUrl, 1080, 400, 0.75);
+  }
+  if (optimizedProfile.theme?.customBgImage && (optimizedProfile.theme.customBgImage.startsWith('data:image/') || optimizedProfile.theme.customBgImage.startsWith('blob:'))) {
+    optimizedProfile.theme = {
+      ...optimizedProfile.theme,
+      customBgImage: await optimizeImageForStorage(optimizedProfile.theme.customBgImage, 1280, 800, 0.75),
+    };
+  }
+
+  return {
+    menus: sanitizeForFirestore(optimizedMenus),
+    profile: sanitizeForFirestore(optimizedProfile),
+  };
+}
+
+/**
  * Publish updated menus and profile to Cloud Firestore so all devices sync instantly.
  */
 export async function publishLivePortalToCloud(
@@ -94,8 +135,8 @@ export async function publishLivePortalToCloud(
     const draftRef = doc(db, 'settings', DRAFT_DOC);
     const now = new Date().toISOString();
     
-    const cleanMenus = sanitizeForFirestore(menus);
-    const cleanProfile = sanitizeForFirestore(profile);
+    // Automatically optimize custom images so Firestore 1MB limit is never exceeded
+    const { menus: cleanMenus, profile: cleanProfile } = await optimizePortalPayload(menus, profile);
 
     const payload: LivePortalData = {
       menus: cleanMenus,
@@ -207,8 +248,7 @@ export async function saveAdminDraftToCloud(
 ): Promise<boolean> {
   try {
     const docRef = doc(db, 'settings', DRAFT_DOC);
-    const cleanMenus = sanitizeForFirestore(menus);
-    const cleanProfile = sanitizeForFirestore(profile);
+    const { menus: cleanMenus, profile: cleanProfile } = await optimizePortalPayload(menus, profile);
     await setDoc(docRef, {
       menus: cleanMenus,
       profile: cleanProfile,

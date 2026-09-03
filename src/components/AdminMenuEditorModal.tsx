@@ -25,6 +25,7 @@ import {
 import { MenuItem, ButtonSize, ButtonActionType, AnimationEffect, ThemeConfig } from '../types';
 import { AVAILABLE_ICONS, getIconComponent } from '../utils/iconMap';
 import { DirectMenuButton } from './DirectMenuButton';
+import { optimizeImageForStorage } from '../utils/imageOptimizer';
 
 interface AdminMenuEditorModalProps {
   isOpen: boolean;
@@ -104,25 +105,33 @@ export const AdminMenuEditorModal: React.FC<AdminMenuEditorModalProps> = ({
     '🌐', '📍', '🔔', '📢', '💡', '🛡️', '🎯', '🚀', '⭐', '✨'
   ];
 
-  const handleIconUpload = (file: File) => {
+  const handleIconUpload = async (file: File) => {
     if (!file.type.startsWith('image/')) {
       alert('Harap unggah file gambar (PNG, SVG, JPG, WebP, ICO, GIF).');
       return;
     }
-    if (file.size > 2.5 * 1024 * 1024) {
-      alert('Ukuran file maksimal 2.5 MB agar aplikasi tetap ringan.');
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      if (e.target?.result) {
+    try {
+      // Auto compress and optimize to compact 160x160 webp/png (< 10 KB)
+      const compressedDataUrl = await optimizeImageForStorage(file, 160, 160, 0.85);
+      if (compressedDataUrl) {
         setFormData((prev) => ({
           ...prev,
-          iconName: e.target?.result as string,
+          iconName: compressedDataUrl,
         }));
       }
-    };
-    reader.readAsDataURL(file);
+    } catch (err) {
+      console.warn('Error compressing icon:', err);
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        if (e.target?.result) {
+          setFormData((prev) => ({
+            ...prev,
+            iconName: e.target?.result as string,
+          }));
+        }
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   // WhatsApp quick helper state

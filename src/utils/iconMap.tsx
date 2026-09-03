@@ -147,8 +147,10 @@ export const getIconComponent = (iconName: string, className = 'w-5 h-5'): React
     return <IconComponent className={className} />;
   }
 
-  // 3. Emoji symbol (e.g. 🕒, 📄, 🌴, 🏥, 🏢, ⚡)
-  if (iconName.length <= 4) {
+  // 3. Emoji symbol (e.g. 🕒, 📄, 🌴, 🏥, 🏢, ⚡, 👨‍💻, 🏛️)
+  // Check if string contains emoji characters or is not a typical ASCII identifier
+  const isLikelyEmoji = /\p{Extended_Pictographic}/u.test(iconName) || iconName.length <= 8;
+  if (isLikelyEmoji) {
     return (
       <span className="leading-none text-center select-none inline-flex items-center justify-center text-lg">
         {iconName}

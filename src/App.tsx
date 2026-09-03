@@ -143,8 +143,55 @@ export default function App() {
       }
     );
 
+    // Multi-tab instant synchronization in the same browser (0ms latency)
+    let channel: BroadcastChannel | null = null;
+    if (typeof BroadcastChannel !== 'undefined') {
+      try {
+        channel = new BroadcastChannel('direct_menu_live_sync');
+        channel.onmessage = (event) => {
+          if (event.data?.type === 'PORTAL_LIVE_UPDATE') {
+            const { menus: pubMenus, profile: pubProfile, timestamp } = event.data;
+            if (pubMenus && Array.isArray(pubMenus)) {
+              setLiveMenus(pubMenus);
+            }
+            if (pubProfile) {
+              setLiveProfile(pubProfile);
+            }
+            if (timestamp) {
+              setLastPublishedAt(timestamp);
+            }
+            setIsCloudSynced(true);
+          }
+        };
+      } catch (e) {
+        console.warn('BroadcastChannel error:', e);
+      }
+    }
+
+    // Storage event listener fallback for multi-tab sync
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === LOCAL_STORAGE_LIVE_MENUS_KEY && e.newValue) {
+        try {
+          setLiveMenus(JSON.parse(e.newValue));
+        } catch {}
+      }
+      if (e.key === LOCAL_STORAGE_LIVE_PROFILE_KEY && e.newValue) {
+        try {
+          setLiveProfile(JSON.parse(e.newValue));
+        } catch {}
+      }
+      if (e.key === LOCAL_STORAGE_LAST_PUBLISHED_KEY && e.newValue) {
+        setLastPublishedAt(e.newValue);
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
+
     return () => {
       unsubscribe();
+      if (channel) {
+        channel.close();
+      }
+      window.removeEventListener('storage', handleStorageChange);
     };
   }, []);
 
@@ -391,40 +438,64 @@ export default function App() {
     setIsPublishing(true);
     const updatedMenus = JSON.parse(JSON.stringify(menus));
     const updatedProfile = JSON.parse(JSON.stringify(profile));
+    const now = new Date().toISOString();
 
-    // Update local state immediately
+    // 1. Update local state and localStorage immediately
     setLiveMenus(updatedMenus);
     setLiveProfile(updatedProfile);
+    setLastPublishedAt(now);
 
     try {
-      // Sync directly to Cloud Firestore so ALL devices in the company receive updates immediately
+      localStorage.setItem(LOCAL_STORAGE_LIVE_MENUS_KEY, JSON.stringify(updatedMenus));
+      localStorage.setItem(LOCAL_STORAGE_LIVE_PROFILE_KEY, JSON.stringify(updatedProfile));
+      localStorage.setItem(LOCAL_STORAGE_LAST_PUBLISHED_KEY, now);
+    } catch {
+      // ignore
+    }
+
+    // 2. Broadcast immediately to any other tabs or windows in the same browser (0ms latency)
+    if (typeof BroadcastChannel !== 'undefined') {
+      try {
+        const bc = new BroadcastChannel('direct_menu_live_sync');
+        bc.postMessage({
+          type: 'PORTAL_LIVE_UPDATE',
+          menus: updatedMenus,
+          profile: updatedProfile,
+          timestamp: now,
+        });
+        bc.close();
+      } catch (e) {
+        console.warn('Broadcast error:', e);
+      }
+    }
+
+    try {
+      // 3. Sync directly to Cloud Firestore so ALL devices and public URLs receive updates immediately
       const result = await publishLivePortalToCloud(updatedMenus, updatedProfile);
       setLastPublishedAt(result.timestamp);
       
-      if (result.error) {
+      if (!result.success || result.error) {
         setIsCloudSynced(false);
         setPublishStatus({
-          success: true,
+          success: false,
           cloudSynced: false,
-          message: `Perubahan tersimpan lokal. (Cloud: ${result.error})`
+          message: `Perubahan baru tersimpan lokal. Gagal terhubung ke Cloud: ${result.error || 'Koneksi terputus'}`
         });
       } else {
         setIsCloudSynced(true);
         setPublishStatus({
           success: true,
           cloudSynced: true,
-          message: 'Berhasil disinkronkan ke Cloud Firestore. Semua perangkat otomatis diperbarui!'
+          message: 'Berhasil diposting ke Cloud Firestore! Semua perangkat pegawai & tab browser otomatis diperbarui.'
         });
       }
     } catch (error: any) {
       console.warn('Cloud publishing failed, fell back to local storage:', error);
-      const now = new Date().toISOString();
-      setLastPublishedAt(now);
       setIsCloudSynced(false);
       setPublishStatus({
-        success: true,
+        success: false,
         cloudSynced: false,
-        message: 'Perubahan tersimpan di browser Anda.'
+        message: `Tersimpan di browser ini saja. (Cloud error: ${error?.message || 'Gagal menyimpan'})`
       });
     } finally {
       setIsPublishing(false);
