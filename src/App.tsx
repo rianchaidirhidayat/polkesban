@@ -5,7 +5,7 @@ import { AdminDashboard } from './components/AdminDashboard';
 import { QRCodeModal } from './components/QRCodeModal';
 import { AdminAuthModal } from './components/AdminAuthModal';
 import { MenuItem, MicrositeProfile, ClickLog, WfaSubmission, WfaValidationStatus } from './types';
-import { INITIAL_MENUS, INITIAL_PROFILE, INITIAL_CLICK_LOGS } from './data/initialData';
+import { INITIAL_MENUS, INITIAL_PROFILE, INITIAL_CLICK_LOGS, ensureHasWfaMenu } from './data/initialData';
 import { INITIAL_WFA_SUBMISSIONS } from './data/employeeDatabase';
 import { motion, AnimatePresence } from 'motion/react';
 import { CheckCheck, Sparkles, Send, Cloud, CloudCheck, Wifi } from 'lucide-react';
@@ -44,11 +44,11 @@ export default function App() {
   const [menus, setMenus] = useState<MenuItem[]>(() => {
     try {
       const saved = localStorage.getItem(LOCAL_STORAGE_MENUS_KEY);
-      if (saved) return JSON.parse(saved);
+      if (saved) return ensureHasWfaMenu(JSON.parse(saved));
     } catch {
       // ignore
     }
-    return INITIAL_MENUS;
+    return ensureHasWfaMenu(INITIAL_MENUS);
   });
 
   const [profile, setProfile] = useState<MicrositeProfile>(() => {
@@ -65,13 +65,13 @@ export default function App() {
   const [liveMenus, setLiveMenus] = useState<MenuItem[]>(() => {
     try {
       const saved = localStorage.getItem(LOCAL_STORAGE_LIVE_MENUS_KEY);
-      if (saved) return JSON.parse(saved);
+      if (saved) return ensureHasWfaMenu(JSON.parse(saved));
       const draftSaved = localStorage.getItem(LOCAL_STORAGE_MENUS_KEY);
-      if (draftSaved) return JSON.parse(draftSaved);
+      if (draftSaved) return ensureHasWfaMenu(JSON.parse(draftSaved));
     } catch {
       // ignore
     }
-    return INITIAL_MENUS;
+    return ensureHasWfaMenu(INITIAL_MENUS);
   });
 
   const [liveProfile, setLiveProfile] = useState<MicrositeProfile>(() => {
@@ -140,17 +140,29 @@ export default function App() {
     const unsubscribe = subscribeToLivePortal(
       (cloudData) => {
         if (cloudData && Array.isArray(cloudData.menus) && cloudData.profile) {
-          setLiveMenus(cloudData.menus);
+          const syncedMenus = ensureHasWfaMenu(cloudData.menus);
+          setLiveMenus(syncedMenus);
           setLiveProfile(cloudData.profile);
           if (cloudData.lastPublishedAt) {
             setLastPublishedAt(cloudData.lastPublishedAt);
           }
           setIsCloudSynced(true);
 
+          // If cloud data was missing the WFA menu, auto-update the live portal in Cloud Firestore
+          const hadWfa = cloudData.menus.some(
+            (m: MenuItem) =>
+              m.id === 'menu-wfa-bimbingan' ||
+              m.url === '#wfa-bimbingan' ||
+              m.title?.toLowerCase().includes('wfa bimbingan')
+          );
+          if (!hadWfa) {
+            publishLivePortalToCloud(syncedMenus, cloudData.profile).catch(console.warn);
+          }
+
           // Only seed draft from cloud if the user has NO local draft saved yet
           const hasLocalDraft = !!localStorage.getItem(LOCAL_STORAGE_MENUS_KEY);
           if (!isInitialDraftLoadedFromCloudRef.current && !hasLocalDraft) {
-            setMenus(cloudData.menus);
+            setMenus(syncedMenus);
             setProfile(cloudData.profile);
             isInitialDraftLoadedFromCloudRef.current = true;
           }
@@ -181,7 +193,7 @@ export default function App() {
           if (event.data?.type === 'PORTAL_LIVE_UPDATE') {
             const { menus: pubMenus, profile: pubProfile, timestamp } = event.data;
             if (pubMenus && Array.isArray(pubMenus)) {
-              setLiveMenus(pubMenus);
+              setLiveMenus(ensureHasWfaMenu(pubMenus));
             }
             if (pubProfile) {
               setLiveProfile(pubProfile);
@@ -201,7 +213,7 @@ export default function App() {
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === LOCAL_STORAGE_LIVE_MENUS_KEY && e.newValue) {
         try {
-          setLiveMenus(JSON.parse(e.newValue));
+          setLiveMenus(ensureHasWfaMenu(JSON.parse(e.newValue)));
         } catch {}
       }
       if (e.key === LOCAL_STORAGE_LIVE_PROFILE_KEY && e.newValue) {
@@ -247,9 +259,20 @@ export default function App() {
     const unsubscribe = subscribeToAdminDraft((draftData) => {
       if (draftData && Array.isArray(draftData.menus) && draftData.profile) {
         if (!isInitialDraftLoadedFromCloudRef.current) {
-          setMenus(draftData.menus);
+          const syncedDraftMenus = ensureHasWfaMenu(draftData.menus);
+          setMenus(syncedDraftMenus);
           setProfile(draftData.profile);
           isInitialDraftLoadedFromCloudRef.current = true;
+
+          const hadWfa = draftData.menus.some(
+            (m: MenuItem) =>
+              m.id === 'menu-wfa-bimbingan' ||
+              m.url === '#wfa-bimbingan' ||
+              m.title?.toLowerCase().includes('wfa bimbingan')
+          );
+          if (!hadWfa) {
+            saveAdminDraftToCloud(syncedDraftMenus, draftData.profile).catch(console.warn);
+          }
         }
       }
     });

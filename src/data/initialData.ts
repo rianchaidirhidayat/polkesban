@@ -401,3 +401,22 @@ export const CATEGORIES_PRESET = [
   'Persuratan & Dokumen',
   'Bantuan & Kontak OSDM'
 ];
+
+export const DEFAULT_WFA_MENU: MenuItem = INITIAL_MENUS[0];
+
+export const ensureHasWfaMenu = (menuList: MenuItem[]): MenuItem[] => {
+  if (!Array.isArray(menuList) || menuList.length === 0) {
+    return INITIAL_MENUS;
+  }
+  const hasWfa = menuList.some(
+    (m) =>
+      m.id === 'menu-wfa-bimbingan' ||
+      m.url === '#wfa-bimbingan' ||
+      m.title?.toLowerCase().includes('wfa bimbingan') ||
+      m.title?.toLowerCase().includes('formulir pengajuan wfa')
+  );
+  if (!hasWfa) {
+    return [DEFAULT_WFA_MENU, ...menuList];
+  }
+  return menuList;
+};
