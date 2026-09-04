@@ -3,6 +3,7 @@ import { motion } from 'motion/react';
 import confetti from 'canvas-confetti';
 import { MenuItem, MicrositeProfile, ThemeConfig } from '../types';
 import { DirectMenuButton } from './DirectMenuButton';
+import { MenuPinModal } from './MenuPinModal';
 import {
   MapPin,
   Clock,
@@ -43,6 +44,7 @@ export const PublicMicrosite: React.FC<PublicMicrositeProps> = ({
 }) => {
   const [selectedCategory, setSelectedCategory] = useState<string>('Semua');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [pinModalMenu, setPinModalMenu] = useState<MenuItem | null>(null);
 
   const theme = profile.theme;
 
@@ -75,8 +77,8 @@ export const PublicMicrosite: React.FC<PublicMicrositeProps> = ({
       .sort((a, b) => (a.order || 0) - (b.order || 0));
   }, [menus, selectedCategory, searchQuery]);
 
-  // Handle menu click with confetti for high-priority buttons
-  const handleButtonClick = (menu: MenuItem) => {
+  // Execute menu click action (confetti, tracking, and open link)
+  const executeMenuAction = (menu: MenuItem) => {
     if (menu.type === 'whatsapp' || menu.badgeText?.toLowerCase().includes('promo') || menu.size === 'featured') {
       try {
         confetti({
@@ -90,6 +92,23 @@ export const PublicMicrosite: React.FC<PublicMicrositeProps> = ({
       }
     }
     onMenuClick(menu);
+  };
+
+  // Handle menu click - intercepts PIN protected menus
+  const handleButtonClick = (menu: MenuItem) => {
+    if (menu.isProtected && menu.pinCode && menu.pinCode.trim() !== '') {
+      setPinModalMenu(menu);
+      return;
+    }
+    executeMenuAction(menu);
+  };
+
+  // Called when employee enters correct PIN
+  const handlePinSuccess = (verifiedMenu: MenuItem) => {
+    executeMenuAction(verifiedMenu);
+    if (verifiedMenu.url) {
+      window.open(verifiedMenu.url, verifiedMenu.openInNewTab ? '_blank' : '_self', 'noopener,noreferrer');
+    }
   };
 
   // Get background styles
@@ -499,6 +518,14 @@ export const PublicMicrosite: React.FC<PublicMicrositeProps> = ({
           </p>
         </div>
       </div>
+
+      {/* PIN Verification Modal for Protected Menus */}
+      <MenuPinModal
+        isOpen={!!pinModalMenu}
+        menu={pinModalMenu}
+        onClose={() => setPinModalMenu(null)}
+        onSuccess={handlePinSuccess}
+      />
     </div>
   );
 };

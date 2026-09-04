@@ -41,6 +41,9 @@ export interface MenuItem {
   openInNewTab: boolean;
   priceTag?: string;
   customCss?: string;
+  isProtected?: boolean;
+  pinCode?: string;
+  pinHint?: string;
 }
 
 export interface SocialLink {

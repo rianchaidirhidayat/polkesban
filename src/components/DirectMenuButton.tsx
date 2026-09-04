@@ -2,7 +2,7 @@ import React from 'react';
 import { motion } from 'motion/react';
 import { MenuItem, ThemeConfig } from '../types';
 import { getIconComponent } from '../utils/iconMap';
-import { ExternalLink, ChevronRight, Zap, Sparkles } from 'lucide-react';
+import { ExternalLink, ChevronRight, Zap, Sparkles, Lock } from 'lucide-react';
 
 interface DirectMenuButtonProps {
   menu: MenuItem;
@@ -24,6 +24,17 @@ export const DirectMenuButton: React.FC<DirectMenuButtonProps> = ({
   }
 
   const handleClick = (e: React.MouseEvent<HTMLAnchorElement | HTMLButtonElement>) => {
+    if (isPreviewMode) {
+      e.preventDefault();
+      return;
+    }
+    if (menu.isProtected && menu.pinCode && menu.pinCode.trim() !== '') {
+      e.preventDefault();
+      if (onMenuClick) {
+        onMenuClick(menu);
+      }
+      return;
+    }
     if (onMenuClick) {
       onMenuClick(menu);
     }
@@ -182,10 +193,19 @@ export const DirectMenuButton: React.FC<DirectMenuButtonProps> = ({
               </div>
             )}
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <h3 className={`${sizeStyle.title} truncate leading-snug`}>
                 {menu.title}
               </h3>
+              {menu.isProtected && (
+                <span
+                  title="Menu ini dilindungi kode PIN rahasia"
+                  className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-400/25 border border-amber-300/40 text-amber-200 shrink-0"
+                >
+                  <Lock className="w-2.5 h-2.5 text-amber-300" />
+                  PIN
+                </span>
+              )}
               {menu.priceTag && (
                 <span className="shrink-0 text-xs px-2 py-0.5 rounded-full bg-white/20 font-mono font-bold">
                   {menu.priceTag}
@@ -211,7 +231,11 @@ export const DirectMenuButton: React.FC<DirectMenuButtonProps> = ({
               </span>
             )}
             <div className="w-7 h-7 rounded-full bg-black/15 flex items-center justify-center group-hover:translate-x-1 transition-transform border border-white/10">
-              <ChevronRight className="w-4 h-4 opacity-80" />
+              {menu.isProtected ? (
+                <Lock className="w-3.5 h-3.5 text-amber-300 opacity-90" />
+              ) : (
+                <ChevronRight className="w-4 h-4 opacity-80" />
+              )}
             </div>
           </div>
         )}

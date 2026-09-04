@@ -232,7 +232,10 @@ export const INITIAL_MENUS: MenuItem[] = [
     animation: 'none',
     clickCount: 260,
     category: 'Kesejahteraan & Remunerasi',
-    openInNewTab: true
+    openInNewTab: true,
+    isProtected: true,
+    pinCode: '1234',
+    pinHint: 'PIN Demo bawaan: 1234 (Data Rahasia Penggajian)',
   },
   {
     id: 'menu-6',

@@ -20,7 +20,11 @@ import {
   Trash2,
   RotateCcw,
   Smile,
-  Globe
+  Globe,
+  Lock,
+  EyeOff,
+  KeyRound,
+  ShieldCheck
 } from 'lucide-react';
 import { MenuItem, ButtonSize, ButtonActionType, AnimationEffect, ThemeConfig } from '../types';
 import { AVAILABLE_ICONS, getIconComponent } from '../utils/iconMap';
@@ -91,10 +95,14 @@ export const AdminMenuEditorModal: React.FC<AdminMenuEditorModalProps> = ({
     category: 'Kepegawaian & HR',
     openInNewTab: true,
     priceTag: '',
+    isProtected: false,
+    pinCode: '',
+    pinHint: '',
   });
 
   const [iconSearch, setIconSearch] = useState('');
-  const [activeTab, setActiveTab] = useState<'content' | 'appearance' | 'icon' | 'badge'>('content');
+  const [activeTab, setActiveTab] = useState<'content' | 'appearance' | 'icon' | 'badge' | 'security'>('content');
+  const [showAdminPinInput, setShowAdminPinInput] = useState(false);
   const [isIconDragging, setIsIconDragging] = useState(false);
   const [iconFilterMode, setIconFilterMode] = useState<'all' | 'lucide' | 'emoji' | 'uploaded'>('all');
   const [customIconUrlInput, setCustomIconUrlInput] = useState('');
@@ -166,6 +174,9 @@ export const AdminMenuEditorModal: React.FC<AdminMenuEditorModalProps> = ({
         category: 'Kepegawaian & HR',
         openInNewTab: true,
         priceTag: '',
+        isProtected: false,
+        pinCode: '',
+        pinHint: '',
       });
     }
   }, [initialMenu, isOpen]);
@@ -176,6 +187,11 @@ export const AdminMenuEditorModal: React.FC<AdminMenuEditorModalProps> = ({
     e.preventDefault();
     if (!formData.title.trim()) {
       alert('Mohon isi judul menu!');
+      return;
+    }
+    if (formData.isProtected && (!formData.pinCode || formData.pinCode.trim() === '')) {
+      alert('Anda mengaktifkan Proteksi PIN. Mohon tentukan kode PIN terlebih dahulu pada tab "Keamanan PIN"!');
+      setActiveTab('security');
       return;
     }
     onSave(formData);
@@ -283,6 +299,21 @@ export const AdminMenuEditorModal: React.FC<AdminMenuEditorModalProps> = ({
                 >
                   <Tag className="w-3.5 h-3.5" />
                   Badge & Efek
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('security')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium whitespace-nowrap transition-all flex-1 justify-center ${
+                    activeTab === 'security'
+                      ? 'bg-indigo-600 text-white shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <Lock className="w-3.5 h-3.5" />
+                  <span>Keamanan PIN</span>
+                  {formData.isProtected && (
+                    <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" title="Proteksi PIN Aktif" />
+                  )}
                 </button>
               </div>
 
@@ -950,6 +981,135 @@ export const AdminMenuEditorModal: React.FC<AdminMenuEditorModalProps> = ({
                   </div>
                 </div>
               )}
+
+              {/* TAB 5: KEAMANAN & PROTEKSI PIN */}
+              {activeTab === 'security' && (
+                <div className="space-y-4">
+                  {/* Security Intro Banner */}
+                  <div className="p-4 rounded-xl bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200">
+                    <div className="flex items-start gap-3">
+                      <div className="p-2 rounded-lg bg-amber-100 text-amber-800 shrink-0 shadow-xs">
+                        <Lock className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-bold text-amber-950">
+                          Proteksi Menu Rahasia dengan PIN
+                        </h4>
+                        <p className="text-xs text-amber-800/90 mt-0.5 leading-relaxed">
+                          Aktifkan PIN jika menu ini berisi data rahasia atau terbatas (seperti slip gaji, dokumen evaluasi pimpinan, SK internal, atau form sensitif). Pegawai wajib memasukkan PIN sebelum dapat membuka tautan.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Main Toggle Card */}
+                  <div className="p-4 rounded-xl border border-slate-200 bg-white shadow-xs">
+                    <label className="flex items-start gap-3 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={!!formData.isProtected}
+                        onChange={(e) => {
+                          const checked = e.target.checked;
+                          setFormData({
+                            ...formData,
+                            isProtected: checked,
+                            pinCode: checked && !formData.pinCode ? '1234' : formData.pinCode,
+                          });
+                        }}
+                        className="w-4 h-4 mt-0.5 rounded text-amber-600 border-slate-300 focus:ring-amber-500"
+                      />
+                      <div className="flex-1">
+                        <div className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                          <span>Kunci Menu Ini dengan Kode PIN</span>
+                          {formData.isProtected && (
+                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-bold border border-amber-200">
+                              Aktif
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-slate-500 mt-0.5">
+                          Ketika pegawai mengklik tombol ini di portal, jendela verifikasi PIN akan muncul secara otomatis.
+                        </p>
+                      </div>
+                    </label>
+
+                    {formData.isProtected && (
+                      <div className="mt-4 pt-4 border-t border-slate-100 space-y-4">
+                        {/* PIN Code Field */}
+                        <div>
+                          <div className="flex items-center justify-between mb-1.5">
+                            <label className="text-xs font-semibold text-slate-700 flex items-center gap-1">
+                              <KeyRound className="w-3.5 h-3.5 text-amber-600" />
+                              <span>Kode PIN Akses</span>
+                              <span className="text-rose-500">*</span>
+                            </label>
+                            <div className="flex items-center gap-1 text-[11px] text-slate-400">
+                              <span className="hidden sm:inline">Pilihan cepat:</span>
+                              {['1234', '2026', '9999'].map((presetPin) => (
+                                <button
+                                  key={presetPin}
+                                  type="button"
+                                  onClick={() => setFormData({ ...formData, pinCode: presetPin })}
+                                  className="px-1.5 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-mono text-[10px] transition-colors"
+                                >
+                                  {presetPin}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                          <div className="relative">
+                            <input
+                              type={showAdminPinInput ? 'text' : 'password'}
+                              placeholder="Masukkan kode PIN (misal: 1234 atau HRD77)"
+                              value={formData.pinCode || ''}
+                              onChange={(e) => setFormData({ ...formData, pinCode: e.target.value })}
+                              className="w-full pl-3.5 pr-10 py-2 bg-white border border-slate-200 rounded-lg text-sm font-mono text-slate-900 placeholder-slate-400 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setShowAdminPinInput(!showAdminPinInput)}
+                              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1"
+                              tabIndex={-1}
+                              title={showAdminPinInput ? 'Sembunyikan PIN' : 'Lihat PIN'}
+                            >
+                              {showAdminPinInput ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                            </button>
+                          </div>
+                          <p className="text-[11px] text-slate-500 mt-1">
+                            Bisa berupa 4-8 digit angka atau kombinasi huruf & angka rahasia.
+                          </p>
+                        </div>
+
+                        {/* Petunjuk PIN */}
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                            Petunjuk / Hint PIN untuk Pegawai (Opsional)
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="Contoh: Hubungi Bagian HRD / 4 digit NIP pimpinan"
+                            value={formData.pinHint || ''}
+                            onChange={(e) => setFormData({ ...formData, pinHint: e.target.value })}
+                            className="w-full px-3.5 py-2 bg-white border border-slate-200 rounded-lg text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
+                          />
+                          <p className="text-[11px] text-slate-500 mt-1">
+                            Petunjuk ini muncul di jendela verifikasi pegawai untuk memberi panduan kepada mereka yang berhak.
+                          </p>
+                        </div>
+
+                        {/* Status Summary Banner */}
+                        <div className="p-3 rounded-lg bg-amber-50/70 border border-amber-200 flex items-center justify-between text-xs">
+                          <span className="text-amber-900 font-medium">Tampilan Tombol:</span>
+                          <span className="font-bold text-amber-800 flex items-center gap-1">
+                            <Lock className="w-3.5 h-3.5" />
+                            Akan ada label badge & ikon kunci PIN
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Right Column: Real-time Live Button Preview */}
@@ -989,6 +1149,19 @@ export const AdminMenuEditorModal: React.FC<AdminMenuEditorModalProps> = ({
                     <span>Status:</span>
                     <span className={formData.isActive ? 'text-green-600 font-medium' : 'text-rose-600 font-medium'}>
                       {formData.isActive ? 'Aktif' : 'Non-Aktif'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center pt-1 border-t border-slate-100">
+                    <span>Proteksi PIN:</span>
+                    <span className={formData.isProtected ? 'text-amber-700 font-semibold flex items-center gap-1 text-[11px]' : 'text-slate-400 text-[11px]'}>
+                      {formData.isProtected ? (
+                        <>
+                          <Lock className="w-3 h-3 text-amber-600" />
+                          <span>Terkunci PIN ({formData.pinCode || '...'})</span>
+                        </>
+                      ) : (
+                        'Tidak Terkunci'
+                      )}
                     </span>
                   </div>
                 </div>

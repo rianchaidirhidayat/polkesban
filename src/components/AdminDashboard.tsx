@@ -576,6 +576,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                       {menu.category}
                                     </span>
                                   )}
+                                  {menu.isProtected && (
+                                    <span
+                                      title={`Menu terproteksi PIN: ${menu.pinCode || 'Aktif'}`}
+                                      className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-300 flex items-center gap-1"
+                                    >
+                                      <Lock className="w-2.5 h-2.5 text-amber-600" />
+                                      <span>PIN: {menu.pinCode || 'Aktif'}</span>
+                                    </span>
+                                  )}
                                 </div>
 
                                 <div className="flex items-center gap-3 text-xs text-slate-400 mt-0.5 flex-wrap">
