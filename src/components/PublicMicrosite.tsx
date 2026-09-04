@@ -523,6 +523,7 @@ export const PublicMicrosite: React.FC<PublicMicrositeProps> = ({
       <MenuPinModal
         isOpen={!!pinModalMenu}
         menu={pinModalMenu}
+        logoUrl={profile.avatarUrl}
         onClose={() => setPinModalMenu(null)}
         onSuccess={handlePinSuccess}
       />

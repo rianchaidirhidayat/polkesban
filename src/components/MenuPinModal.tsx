@@ -6,13 +6,18 @@ import { MenuItem } from '../types';
 interface MenuPinModalProps {
   isOpen: boolean;
   menu: MenuItem | null;
+  logoUrl?: string;
   onClose: () => void;
   onSuccess: (menu: MenuItem) => void;
 }
 
+const DEFAULT_POLTEKKES_LOGO = 'https://poltekkesbandung.ac.id/wp-content/uploads/2026/05/cropped-logo-transparan-2.png';
+const FALLBACK_POLTEKKES_EMBLEM = 'https://poltekkesbandung.ac.id/wp-content/uploads/2026/04/cropped-logo-kemkes-192x192.png';
+
 export const MenuPinModal: React.FC<MenuPinModalProps> = ({
   isOpen,
   menu,
+  logoUrl,
   onClose,
   onSuccess,
 }) => {
@@ -20,7 +25,12 @@ export const MenuPinModal: React.FC<MenuPinModalProps> = ({
   const [showPin, setShowPin] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [hasImgError, setHasImgError] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const effectiveLogo = (!hasImgError && logoUrl && !logoUrl.includes('images.unsplash.com'))
+    ? logoUrl
+    : (hasImgError ? FALLBACK_POLTEKKES_EMBLEM : DEFAULT_POLTEKKES_LOGO);
 
   useEffect(() => {
     if (isOpen) {
@@ -84,7 +94,29 @@ export const MenuPinModal: React.FC<MenuPinModalProps> = ({
           </button>
 
           <div className="p-6">
-            {/* Header Icon */}
+            {/* Poltekkes Kemenkes Bandung Institutional Logo Branding */}
+            <div className="flex items-center justify-between gap-3 pb-3.5 mb-4 border-b border-slate-800/80 pr-7">
+              <div className="inline-flex items-center bg-white px-3.5 py-1.5 rounded-xl border border-white/20 shadow-md">
+                <img
+                  src={effectiveLogo}
+                  alt="Logo Resmi Poltekkes Kemenkes Bandung"
+                  className="h-8 w-auto max-w-[190px] sm:max-w-[220px] object-contain"
+                  referrerPolicy="no-referrer"
+                  onError={() => setHasImgError(true)}
+                />
+              </div>
+              <div className="text-right">
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-800 text-[10px] font-semibold text-slate-300 border border-slate-700/80">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  OSDM Terpadu
+                </span>
+                <p className="text-[10px] text-slate-400 mt-0.5 hidden sm:block">
+                  Kemenkes RI
+                </p>
+              </div>
+            </div>
+
+            {/* Header Icon & Title */}
             <div className="flex items-center gap-3.5 mb-4">
               <div className="w-12 h-12 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0 shadow-inner">
                 {isSuccess ? (
