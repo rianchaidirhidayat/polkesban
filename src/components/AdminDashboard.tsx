@@ -47,6 +47,8 @@ import {
   MapPin,
   AlignLeft,
   FileSignature,
+  Share2,
+  RefreshCw,
 } from 'lucide-react';
 import { MenuItem, MicrositeProfile, ClickLog, ButtonSize, ThemeConfig } from '../types';
 import { THEME_PRESETS, CATEGORIES_PRESET } from '../data/initialData';
@@ -62,6 +64,8 @@ interface AdminDashboardProps {
   setMenus: React.Dispatch<React.SetStateAction<MenuItem[]>>;
   profile: MicrositeProfile;
   setProfile: React.Dispatch<React.SetStateAction<MicrositeProfile>>;
+  liveMenus?: MenuItem[];
+  liveProfile?: MicrositeProfile;
   logs: ClickLog[];
   setLogs: React.Dispatch<React.SetStateAction<ClickLog[]>>;
   onOpenPublicPreview: () => void;
@@ -81,6 +85,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   setMenus,
   profile,
   setProfile,
+  liveMenus,
+  liveProfile,
   logs,
   setLogs,
   onOpenPublicPreview,
@@ -103,6 +109,61 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [isBgDragging, setIsBgDragging] = useState(false);
   const [isLogoDragging, setIsLogoDragging] = useState(false);
   const [isFaviconDragging, setIsFaviconDragging] = useState(false);
+  const [copiedShareLink, setCopiedShareLink] = useState(false);
+
+  // Auto publish toggle (defaults to true for zero-friction employee sync)
+  const [autoPublishEnabled, setAutoPublishEnabled] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('direct_menu_auto_publish');
+      return saved !== null ? saved === 'true' : true;
+    } catch {
+      return true;
+    }
+  });
+
+  const handleToggleAutoPublish = () => {
+    const next = !autoPublishEnabled;
+    setAutoPublishEnabled(next);
+    try {
+      localStorage.setItem('direct_menu_auto_publish', String(next));
+    } catch {}
+  };
+
+  // Compare draft vs live to see if there are unpublished changes
+  const hasUnpublishedChanges = React.useMemo(() => {
+    if (!liveMenus || !liveProfile) return false;
+    try {
+      return (
+        JSON.stringify(menus) !== JSON.stringify(liveMenus) ||
+        JSON.stringify(profile) !== JSON.stringify(liveProfile)
+      );
+    } catch {
+      return false;
+    }
+  }, [menus, profile, liveMenus, liveProfile]);
+
+  // Debounced auto-publish effect when autoPublishEnabled is true
+  React.useEffect(() => {
+    if (!autoPublishEnabled || !onPublish || isPublishing) return;
+    if (!hasUnpublishedChanges) return;
+
+    const timer = setTimeout(() => {
+      onPublish();
+    }, 1800);
+
+    return () => clearTimeout(timer);
+  }, [autoPublishEnabled, hasUnpublishedChanges, onPublish, isPublishing]);
+
+  const handleCopyShareLink = () => {
+    try {
+      const url = `${window.location.origin}${window.location.pathname}?mode=public`;
+      navigator.clipboard.writeText(url);
+      setCopiedShareLink(true);
+      setTimeout(() => setCopiedShareLink(false), 2500);
+    } catch (e) {
+      console.warn('Copy link error:', e);
+    }
+  };
 
   // Security tab local state
   const [newPinInput, setNewPinInput] = useState('');
@@ -363,7 +424,108 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       </header>
 
       {/* Main Admin Workspace with Optional Live Preview Frame */}
-      <div className="flex-1 p-4 sm:p-8 max-w-7xl mx-auto w-full">
+      <div className="flex-1 p-4 sm:p-8 max-w-7xl mx-auto w-full space-y-6">
+        {/* Status & Quick Publish Alert Banner */}
+        <div
+          className={`p-4 sm:p-5 rounded-2xl border transition-all shadow-xs ${
+            hasUnpublishedChanges
+              ? 'bg-gradient-to-r from-amber-50 to-orange-50 border-amber-300 text-amber-950'
+              : 'bg-gradient-to-r from-emerald-50 to-teal-50 border-emerald-300 text-emerald-950'
+          }`}
+        >
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            <div className="flex items-start sm:items-center gap-3.5">
+              <div
+                className={`w-3.5 h-3.5 rounded-full mt-1 sm:mt-0 shrink-0 ${
+                  hasUnpublishedChanges
+                    ? 'bg-amber-500 animate-ping'
+                    : 'bg-emerald-500 shadow-xs'
+                }`}
+              />
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3 className="font-bold text-sm sm:text-base">
+                    {hasUnpublishedChanges
+                      ? '⚠️ Ada Perubahan Kustom Yang Belum Diposting ke Pegawai!'
+                      : '✅ Tampilan Pegawai Sudah Tersinkronisasi (Live di Cloud)'}
+                  </h3>
+                  <span
+                    className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-full border ${
+                      hasUnpublishedChanges
+                        ? 'bg-amber-100 text-amber-800 border-amber-300'
+                        : 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                    }`}
+                  >
+                    {lastPublishedAt
+                      ? `Terakhir Diposting: ${new Date(lastPublishedAt).toLocaleTimeString('id-ID', {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                          second: '2-digit',
+                        })}`
+                      : 'Belum pernah diposting'}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-600 mt-1 max-w-2xl">
+                  {hasUnpublishedChanges
+                    ? 'Pegawai yang membuka link saat ini masih melihat versi lama sampai Anda menekan tombol "Posting Sekarang ke Pegawai". Klik tombol di samping untuk langsung memperbarui.'
+                    : 'Semua perubahan menu dan profil kustom Anda sudah aktif di Cloud Firestore. Setiap pegawai yang membuka link akan langsung melihat tampilan ini.'}
+                </p>
+              </div>
+            </div>
+
+            {/* Actions & Auto-publish switch */}
+            <div className="flex flex-wrap items-center gap-2.5 pt-2 lg:pt-0 border-t lg:border-t-0 border-slate-200/60">
+              <label
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/80 border border-slate-200 text-xs text-slate-700 cursor-pointer hover:bg-white shadow-2xs transition-colors"
+                title="Jika aktif, setiap perubahan yang Anda lakukan otomatis langsung tersimpan ke Cloud untuk pegawai"
+              >
+                <input
+                  type="checkbox"
+                  checked={autoPublishEnabled}
+                  onChange={handleToggleAutoPublish}
+                  className="rounded text-emerald-600 focus:ring-emerald-500 w-3.5 h-3.5 cursor-pointer"
+                />
+                <span className="font-medium">⚡ Auto-Posting Otomatis</span>
+              </label>
+
+              <button
+                type="button"
+                onClick={handleCopyShareLink}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white hover:bg-slate-50 text-slate-800 text-xs font-semibold border border-slate-300 shadow-xs transition-colors"
+                title="Salin tautan resmi yang dapat langsung dibagikan ke seluruh pegawai"
+              >
+                <Share2 className="w-3.5 h-3.5 text-indigo-600" />
+                <span>{copiedShareLink ? 'Link Tersalin!' : 'Salin Link Pegawai'}</span>
+              </button>
+
+              {onPublish && (
+                <button
+                  type="button"
+                  onClick={onPublish}
+                  disabled={isPublishing}
+                  className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-bold text-white shadow-sm transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-75 ${
+                    hasUnpublishedChanges
+                      ? 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 ring-2 ring-emerald-400/40 animate-pulse'
+                      : 'bg-emerald-600 hover:bg-emerald-700'
+                  }`}
+                >
+                  {isPublishing ? (
+                    <>
+                      <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      <span>Memposting ke Cloud...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Send className="w-3.5 h-3.5" />
+                      <span>Posting Sekarang ke Pegawai</span>
+                    </>
+                  )}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+
         <div className={`grid grid-cols-1 ${showLiveSidePreview ? 'xl:grid-cols-12' : ''} gap-8 items-start`}>
           {/* Main Editing Column */}
           <div className={showLiveSidePreview ? 'xl:col-span-8' : 'w-full'}>

@@ -130,8 +130,9 @@ export default function App() {
           }
           setIsCloudSynced(true);
 
-          // If this device / browser hasn't loaded cloud data yet or opened fresh:
-          if (!isInitialDraftLoadedFromCloudRef.current) {
+          // Only seed draft from cloud if the user has NO local draft saved yet
+          const hasLocalDraft = !!localStorage.getItem(LOCAL_STORAGE_MENUS_KEY);
+          if (!isInitialDraftLoadedFromCloudRef.current && !hasLocalDraft) {
             setMenus(cloudData.menus);
             setProfile(cloudData.profile);
             isInitialDraftLoadedFromCloudRef.current = true;
@@ -140,6 +141,17 @@ export default function App() {
       },
       (err) => {
         console.warn('Firestore subscription status:', err);
+      },
+      async () => {
+        // Cloud document doesn't exist yet on Firestore!
+        // Automatically seed with current menus and profile so any employee opening the link sees it immediately.
+        try {
+          console.log('Seeding initial portal live data to Cloud Firestore...');
+          await publishLivePortalToCloud(menus, profile);
+          setIsCloudSynced(true);
+        } catch (e) {
+          console.warn('Firestore auto-seed error:', e);
+        }
       }
     );
 
@@ -253,6 +265,10 @@ export default function App() {
 
   const [currentView, setCurrentView] = useState<'public' | 'admin' | 'split'>(() => {
     try {
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get('mode') === 'public') {
+        return 'public';
+      }
       const isAuth = sessionStorage.getItem(SESSION_ADMIN_AUTH_KEY) === 'true';
       if (isAuth) return 'admin';
     } catch {
@@ -669,6 +685,8 @@ export default function App() {
             setMenus={setMenus}
             profile={profile}
             setProfile={setProfile}
+            liveMenus={liveMenus}
+            liveProfile={liveProfile}
             logs={logs}
             setLogs={setLogs}
             onOpenPublicPreview={() => setCurrentView('public')}
@@ -694,6 +712,8 @@ export default function App() {
                 setMenus={setMenus}
                 profile={profile}
                 setProfile={setProfile}
+                liveMenus={liveMenus}
+                liveProfile={liveProfile}
                 logs={logs}
                 setLogs={setLogs}
                 onOpenPublicPreview={() => setCurrentView('public')}

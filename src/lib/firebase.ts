@@ -62,7 +62,8 @@ function sanitizeForFirestore(obj: any): any {
  */
 export function subscribeToLivePortal(
   onUpdate: (data: LivePortalData) => void,
-  onError?: (error: any) => void
+  onError?: (error: any) => void,
+  onDocMissing?: () => void
 ) {
   const docRef = doc(db, 'portal', LIVE_PORTAL_DOC);
   
@@ -73,6 +74,10 @@ export function subscribeToLivePortal(
         const data = snapshot.data() as LivePortalData;
         if (data && Array.isArray(data.menus) && data.profile) {
           onUpdate(data);
+        }
+      } else {
+        if (onDocMissing) {
+          onDocMissing();
         }
       }
     },
