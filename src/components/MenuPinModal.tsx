@@ -94,25 +94,16 @@ export const MenuPinModal: React.FC<MenuPinModalProps> = ({
           </button>
 
           <div className="p-6">
-            {/* Poltekkes Kemenkes Bandung Institutional Logo Branding */}
-            <div className="flex items-center justify-between gap-3 pb-3.5 mb-4 border-b border-slate-800/80 pr-7">
-              <div className="inline-flex items-center bg-white px-3.5 py-1.5 rounded-xl border border-white/20 shadow-md">
+            {/* Poltekkes Kemenkes Bandung Institutional Logo Branding (Centered) */}
+            <div className="flex items-center justify-center pb-4 mb-4 border-b border-slate-800/80">
+              <div className="inline-flex items-center justify-center bg-white px-4 py-2 rounded-xl border border-white/20 shadow-md">
                 <img
                   src={effectiveLogo}
                   alt="Logo Resmi Poltekkes Kemenkes Bandung"
-                  className="h-8 w-auto max-w-[190px] sm:max-w-[220px] object-contain"
+                  className="h-8 sm:h-9 w-auto max-w-[240px] object-contain"
                   referrerPolicy="no-referrer"
                   onError={() => setHasImgError(true)}
                 />
-              </div>
-              <div className="text-right">
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-800 text-[10px] font-semibold text-slate-300 border border-slate-700/80">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                  OSDM Terpadu
-                </span>
-                <p className="text-[10px] text-slate-400 mt-0.5 hidden sm:block">
-                  Kemenkes RI
-                </p>
               </div>
             </div>
 
