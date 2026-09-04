@@ -4,8 +4,9 @@ import { PublicMicrosite } from './components/PublicMicrosite';
 import { AdminDashboard } from './components/AdminDashboard';
 import { QRCodeModal } from './components/QRCodeModal';
 import { AdminAuthModal } from './components/AdminAuthModal';
-import { MenuItem, MicrositeProfile, ClickLog } from './types';
+import { MenuItem, MicrositeProfile, ClickLog, WfaSubmission, WfaValidationStatus } from './types';
 import { INITIAL_MENUS, INITIAL_PROFILE, INITIAL_CLICK_LOGS } from './data/initialData';
+import { INITIAL_WFA_SUBMISSIONS } from './data/employeeDatabase';
 import { motion, AnimatePresence } from 'motion/react';
 import { CheckCheck, Sparkles, Send, Cloud, CloudCheck, Wifi } from 'lucide-react';
 import { 
@@ -16,7 +17,11 @@ import {
   saveAdminPinToCloud,
   subscribeToAdminDraft,
   saveAdminDraftToCloud,
-  subscribeToClickLogs
+  subscribeToClickLogs,
+  subscribeToWfaSubmissions,
+  createWfaSubmissionInCloud,
+  updateWfaStatusInCloud,
+  deleteWfaSubmissionInCloud
 } from './lib/firebase';
 
 const LOCAL_STORAGE_MENUS_KEY = 'direct_menu_items_v2';
@@ -24,6 +29,7 @@ const LOCAL_STORAGE_PROFILE_KEY = 'direct_menu_profile_v2';
 const LOCAL_STORAGE_LOGS_KEY = 'direct_menu_logs_v2';
 const LOCAL_STORAGE_ADMIN_PIN_KEY = 'direct_menu_admin_pin_v2';
 const SESSION_ADMIN_AUTH_KEY = 'direct_menu_admin_auth_v2';
+const LOCAL_STORAGE_WFA_SUBMISSIONS_KEY = 'direct_menu_wfa_submissions_v1';
 
 // Live published storage keys (what employees see on public page)
 const LOCAL_STORAGE_LIVE_MENUS_KEY = 'direct_menu_live_items_v2';
@@ -116,6 +122,17 @@ export default function App() {
       // ignore
     }
     return 'admin123';
+  });
+
+  // WFA Bimbingan Submissions state
+  const [wfaSubmissions, setWfaSubmissions] = useState<WfaSubmission[]>(() => {
+    try {
+      const saved = localStorage.getItem(LOCAL_STORAGE_WFA_SUBMISSIONS_KEY);
+      if (saved) return JSON.parse(saved);
+    } catch {
+      // ignore
+    }
+    return INITIAL_WFA_SUBMISSIONS;
   });
 
   // 1. Real-time Cloud Sync for Live Portal across all devices
@@ -339,6 +356,115 @@ export default function App() {
       // ignore
     }
   }, [adminPin]);
+
+  // Real-time Cloud Sync for WFA Submissions
+  useEffect(() => {
+    const unsubscribe = subscribeToWfaSubmissions((cloudSubmissions) => {
+      if (cloudSubmissions && cloudSubmissions.length > 0) {
+        setWfaSubmissions(cloudSubmissions);
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Sync WFA Submissions to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem(LOCAL_STORAGE_WFA_SUBMISSIONS_KEY, JSON.stringify(wfaSubmissions));
+    } catch {
+      // ignore
+    }
+  }, [wfaSubmissions]);
+
+  // Ensure WFA Bimbingan menu exists in menus & liveMenus
+  useEffect(() => {
+    setMenus((prev) => {
+      const hasWfa = prev.some((m) => m.id === 'menu-wfa-bimbingan' || m.url === '#wfa-bimbingan');
+      if (!hasWfa) {
+        const wfaMenu = INITIAL_MENUS.find((m) => m.id === 'menu-wfa-bimbingan');
+        if (wfaMenu) return [wfaMenu, ...prev];
+      }
+      return prev;
+    });
+    setLiveMenus((prev) => {
+      const hasWfa = prev.some((m) => m.id === 'menu-wfa-bimbingan' || m.url === '#wfa-bimbingan');
+      if (!hasWfa) {
+        const wfaMenu = INITIAL_MENUS.find((m) => m.id === 'menu-wfa-bimbingan');
+        if (wfaMenu) return [wfaMenu, ...prev];
+      }
+      return prev;
+    });
+  }, []);
+
+  const handleCreateWfaSubmission = async (data: Omit<WfaSubmission, 'id' | 'status' | 'createdAt'>) => {
+    try {
+      const res = await createWfaSubmissionInCloud(data);
+      if (res.success && res.submission) {
+        const newSub = res.submission;
+        setWfaSubmissions((prev) => [newSub, ...prev.filter((s) => s.id !== newSub.id)]);
+        return { success: true };
+      }
+      throw new Error(res.error || 'Gagal menyimpan ke server');
+    } catch (err: any) {
+      console.error('Cloud WFA submission failed, saving locally:', err);
+      const localSub: WfaSubmission = {
+        ...data,
+        id: `wfa-${Date.now()}`,
+        status: 'Menunggu Validasi',
+        createdAt: new Date().toISOString(),
+      };
+      setWfaSubmissions((prev) => [localSub, ...prev]);
+      return { success: true };
+    }
+  };
+
+  const handleUpdateWfaStatus = async (id: string, status: WfaValidationStatus, notes?: string) => {
+    try {
+      await updateWfaStatusInCloud(id, status, notes, 'Tim OSDM Poltekkes');
+      setWfaSubmissions((prev) =>
+        prev.map((sub) =>
+          sub.id === id
+            ? {
+                ...sub,
+                status,
+                catatanPengelola: notes !== undefined ? notes : sub.catatanPengelola,
+                validatedAt: new Date().toISOString(),
+                validatedBy: 'Tim OSDM Poltekkes',
+              }
+            : sub
+        )
+      );
+      return { success: true };
+    } catch (err: any) {
+      console.error('Cloud WFA update status failed, saving locally:', err);
+      setWfaSubmissions((prev) =>
+        prev.map((sub) =>
+          sub.id === id
+            ? {
+                ...sub,
+                status,
+                catatanPengelola: notes !== undefined ? notes : sub.catatanPengelola,
+                validatedAt: new Date().toISOString(),
+                validatedBy: 'Tim OSDM Poltekkes',
+              }
+            : sub
+        )
+      );
+      return { success: true };
+    }
+  };
+
+  const handleDeleteWfaSubmission = async (id: string) => {
+    try {
+      await deleteWfaSubmissionInCloud(id);
+      setWfaSubmissions((prev) => prev.filter((s) => s.id !== id));
+      return { success: true };
+    } catch (err: any) {
+      console.error('Cloud WFA delete failed, removing locally:', err);
+      setWfaSubmissions((prev) => prev.filter((s) => s.id !== id));
+      return { success: true };
+    }
+  };
 
   // Dynamic Browser Tab Title and Favicon Management
   useEffect(() => {
@@ -656,6 +782,8 @@ export default function App() {
               }}
               isStandalone={true}
               lastPublishedAt={lastPublishedAt}
+              wfaSubmissions={wfaSubmissions}
+              onSubmitWfa={handleCreateWfaSubmission}
             />
           </div>
         )}
@@ -681,6 +809,9 @@ export default function App() {
             onPublish={handlePublishLive}
             isPublishing={isPublishing}
             lastPublishedAt={lastPublishedAt}
+            wfaSubmissions={wfaSubmissions}
+            onUpdateWfaStatus={handleUpdateWfaStatus}
+            onDeleteWfaSubmission={handleDeleteWfaSubmission}
           />
         )}
 
@@ -708,6 +839,9 @@ export default function App() {
                 onPublish={handlePublishLive}
                 isPublishing={isPublishing}
                 lastPublishedAt={lastPublishedAt}
+                wfaSubmissions={wfaSubmissions}
+                onUpdateWfaStatus={handleUpdateWfaStatus}
+                onDeleteWfaSubmission={handleDeleteWfaSubmission}
               />
             </div>
 
@@ -730,6 +864,8 @@ export default function App() {
                   onOpenQR={() => setIsQRModalOpen(true)}
                   isStandalone={false}
                   lastPublishedAt={lastPublishedAt}
+                  wfaSubmissions={wfaSubmissions}
+                  onSubmitWfa={handleCreateWfaSubmission}
                 />
               </div>
             </div>

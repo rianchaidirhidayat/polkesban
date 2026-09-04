@@ -35,6 +35,29 @@
         "referrer": { "type": "string" }
       },
       "required": ["id", "menuId", "menuTitle", "timestamp"]
+    },
+    "WfaSubmission": {
+      "title": "WfaSubmission",
+      "description": "Pengajuan WFA Bimbingan dosen dan pegawai Poltekkes Kemenkes Bandung",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "nip": { "type": "string" },
+        "employeeName": { "type": "string" },
+        "unitKerja": { "type": "string" },
+        "jabatan": { "type": "string" },
+        "tanggalWfa": { "type": "string" },
+        "namaKegiatan": { "type": "string" },
+        "lokasiKegiatan": { "type": "string" },
+        "statusWfa": { "type": "string" },
+        "linkSuratTugas": { "type": "string" },
+        "status": { "type": "string" },
+        "catatanPengelola": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "validatedAt": { "type": "string" },
+        "validatedBy": { "type": "string" }
+      },
+      "required": ["id", "nip", "employeeName", "tanggalWfa", "namaKegiatan", "lokasiKegiatan", "statusWfa", "linkSuratTugas", "status", "createdAt"]
     }
   },
   "firestore": {
@@ -45,6 +68,10 @@
     "/click_logs/{logId}": {
       "schema": "ClickLog",
       "description": "Click event logs"
+    },
+    "/wfa_submissions/{submissionId}": {
+      "schema": "WfaSubmission",
+      "description": "Pengajuan WFA bimbingan pegawai dan status validasi pengelola"
     }
   }
 }

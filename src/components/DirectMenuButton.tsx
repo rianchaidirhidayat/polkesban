@@ -35,6 +35,13 @@ export const DirectMenuButton: React.FC<DirectMenuButtonProps> = ({
       }
       return;
     }
+    if (menu.url?.startsWith('#') || menu.type === 'custom' || menu.id === 'menu-wfa-bimbingan' || menu.title?.toLowerCase().includes('wfa bimbingan')) {
+      e.preventDefault();
+      if (onMenuClick) {
+        onMenuClick(menu);
+      }
+      return;
+    }
     if (onMenuClick) {
       onMenuClick(menu);
     }

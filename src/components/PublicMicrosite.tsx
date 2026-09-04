@@ -22,6 +22,8 @@ import {
   ExternalLink,
   Lock
 } from 'lucide-react';
+import { WfaBimbinganModal } from './WfaBimbinganModal';
+import { WfaSubmission } from '../types';
 
 interface PublicMicrositeProps {
   profile: MicrositeProfile;
@@ -31,6 +33,8 @@ interface PublicMicrositeProps {
   onOpenAdmin?: () => void;
   isStandalone?: boolean;
   lastPublishedAt?: string | null;
+  wfaSubmissions?: WfaSubmission[];
+  onSubmitWfa?: (submission: Omit<WfaSubmission, 'id' | 'status' | 'createdAt'>) => Promise<{ success: boolean; error?: string }>;
 }
 
 export const PublicMicrosite: React.FC<PublicMicrositeProps> = ({
@@ -41,10 +45,13 @@ export const PublicMicrosite: React.FC<PublicMicrositeProps> = ({
   onOpenAdmin,
   isStandalone = false,
   lastPublishedAt,
+  wfaSubmissions = [],
+  onSubmitWfa,
 }) => {
   const [selectedCategory, setSelectedCategory] = useState<string>('Semua');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [pinModalMenu, setPinModalMenu] = useState<MenuItem | null>(null);
+  const [isWfaModalOpen, setIsWfaModalOpen] = useState<boolean>(false);
 
   const theme = profile.theme;
 
@@ -100,6 +107,19 @@ export const PublicMicrosite: React.FC<PublicMicrositeProps> = ({
       setPinModalMenu(menu);
       return;
     }
+
+    // Intercept Formulir Pengajuan WFA Bimbingan to show floating modal
+    if (
+      menu.id === 'menu-wfa-bimbingan' ||
+      menu.url === '#wfa-bimbingan' ||
+      menu.title?.toLowerCase().includes('wfa bimbingan') ||
+      menu.title?.toLowerCase().includes('formulir pengajuan wfa')
+    ) {
+      onMenuClick(menu);
+      setIsWfaModalOpen(true);
+      return;
+    }
+
     executeMenuAction(menu);
   };
 
@@ -526,6 +546,15 @@ export const PublicMicrosite: React.FC<PublicMicrositeProps> = ({
         logoUrl={profile.avatarUrl}
         onClose={() => setPinModalMenu(null)}
         onSuccess={handlePinSuccess}
+      />
+
+      {/* Floating Modal: Formulir Pengajuan WFA Bimbingan & Pengecekan Status */}
+      <WfaBimbinganModal
+        isOpen={isWfaModalOpen}
+        onClose={() => setIsWfaModalOpen(false)}
+        onSubmit={onSubmitWfa || (async () => ({ success: true }))}
+        allSubmissions={wfaSubmissions}
+        logoUrl={profile.avatarUrl}
       />
     </div>
   );

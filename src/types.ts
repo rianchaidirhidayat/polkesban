@@ -119,3 +119,33 @@ export interface AnalyticsSummary {
   } | null;
   todayClicks: number;
 }
+
+export type WfaLocation = 'Kota Bandung' | 'Kabupaten Bandung';
+export type WfaValidationStatus = 'Menunggu Validasi' | 'Valid' | 'Ditolak';
+
+export interface WfaSubmission {
+  id: string;
+  nip: string;
+  employeeName: string;
+  unitKerja?: string;
+  jabatan?: string;
+  tanggalWfa: string; // YYYY-MM-DD
+  namaKegiatan: string;
+  lokasiKegiatan: WfaLocation;
+  lokasiLahanBimbingan: string;
+  statusWfa: string; // 'WFA Datang' | 'WFA Pulang' | 'WFA Datang & WFA Pulang'
+  linkSuratTugas: string;
+  status: WfaValidationStatus;
+  catatanPengelola?: string;
+  createdAt: string; // ISO string
+  validatedAt?: string;
+  validatedBy?: string;
+}
+
+export interface EmployeeRecord {
+  nip: string;
+  name: string;
+  unitKerja: string;
+  jabatan: string;
+  email?: string;
+}

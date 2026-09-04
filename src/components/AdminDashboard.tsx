@@ -50,11 +50,12 @@ import {
   Share2,
   RefreshCw,
 } from 'lucide-react';
-import { MenuItem, MicrositeProfile, ClickLog, ButtonSize, ThemeConfig } from '../types';
+import { MenuItem, MicrositeProfile, ClickLog, ButtonSize, ThemeConfig, WfaSubmission, WfaValidationStatus } from '../types';
 import { THEME_PRESETS, CATEGORIES_PRESET } from '../data/initialData';
 import { getIconComponent } from '../utils/iconMap';
 import { AdminMenuEditorModal } from './AdminMenuEditorModal';
 import { AnalyticsView } from './AnalyticsView';
+import { WfaMonitoringView } from './WfaMonitoringView';
 import { PublicMicrosite } from './PublicMicrosite';
 import { exportToCSV, exportToPDF } from '../utils/exportUtils';
 import { optimizeImageForStorage } from '../utils/imageOptimizer';
@@ -78,6 +79,10 @@ interface AdminDashboardProps {
   onPublish?: () => void;
   isPublishing?: boolean;
   lastPublishedAt?: string | null;
+  wfaSubmissions?: WfaSubmission[];
+  onUpdateWfaStatus?: (id: string, status: WfaValidationStatus, notes?: string) => Promise<{ success: boolean; error?: string }>;
+  onDeleteWfaSubmission?: (id: string) => Promise<{ success: boolean; error?: string }>;
+  onRefreshWfa?: () => void;
 }
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({
@@ -99,8 +104,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   onPublish,
   isPublishing = false,
   lastPublishedAt,
+  wfaSubmissions = [],
+  onUpdateWfaStatus,
+  onDeleteWfaSubmission,
+  onRefreshWfa,
 }) => {
-  const [activeTab, setActiveTab] = useState<'menus' | 'theme' | 'analytics' | 'export' | 'security'>('menus');
+  const [activeTab, setActiveTab] = useState<'menus' | 'theme' | 'analytics' | 'wfa_monitoring' | 'export' | 'security'>('menus');
   const [editingMenu, setEditingMenu] = useState<MenuItem | null>(null);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [showLiveSidePreview, setShowLiveSidePreview] = useState(true);
@@ -343,6 +352,23 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           >
             <BarChart3 className="w-3.5 h-3.5" />
             <span>Analitik Klik</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('wfa_monitoring')}
+            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-md text-xs font-medium transition-all relative ${
+              activeTab === 'wfa_monitoring'
+                ? 'bg-emerald-600 text-white shadow-xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/70'
+            }`}
+          >
+            <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Monitoring WFA</span>
+            {wfaSubmissions.filter(s => s.status === 'Menunggu Validasi').length > 0 && (
+              <span className="px-1.5 py-0.2 rounded-full bg-amber-500 text-slate-950 font-black text-[10px] animate-pulse">
+                {wfaSubmissions.filter(s => s.status === 'Menunggu Validasi').length}
+              </span>
+            )}
           </button>
 
           <button
@@ -2017,6 +2043,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 profile={profile}
                 onSimulateClick={onSimulateClick}
                 onClearLogs={onClearLogs}
+              />
+            )}
+
+            {/* TAB: MONITORING WFA BIMBINGAN */}
+            {activeTab === 'wfa_monitoring' && (
+              <WfaMonitoringView
+                submissions={wfaSubmissions}
+                onUpdateStatus={onUpdateWfaStatus || (async () => ({ success: true }))}
+                onDeleteSubmission={onDeleteWfaSubmission}
+                onRefresh={onRefreshWfa}
               />
             )}
 

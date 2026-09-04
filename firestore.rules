@@ -18,5 +18,10 @@ service cloud.firestore {
     match /settings/{docId} {
       allow read, write: if true;
     }
+
+    // Formulir Pengajuan WFA Bimbingan & Monitoring Validasi
+    match /wfa_submissions/{submissionId} {
+      allow read, write: if true;
+    }
   }
 }
