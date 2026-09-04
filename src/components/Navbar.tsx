@@ -3,7 +3,6 @@ import {
   Globe,
   SlidersHorizontal,
   QrCode,
-  RotateCcw,
   Zap,
   LayoutTemplate,
   ShieldAlert,
@@ -17,7 +16,7 @@ interface NavbarProps {
   currentView: 'public' | 'admin' | 'split';
   setCurrentView: (view: 'public' | 'admin' | 'split') => void;
   onOpenQR: () => void;
-  onResetDemo: () => void;
+  onResetDemo?: () => void;
   onLogout: () => void;
   onPublish?: () => void;
   isPublishing?: boolean;
@@ -30,7 +29,6 @@ export const Navbar: React.FC<NavbarProps> = ({
   currentView,
   setCurrentView,
   onOpenQR,
-  onResetDemo,
   onLogout,
   onPublish,
   isPublishing = false,
@@ -137,19 +135,6 @@ export const Navbar: React.FC<NavbarProps> = ({
         >
           <QrCode className="w-3.5 h-3.5 text-indigo-400" />
           <span className="hidden sm:inline">QR Code</span>
-        </button>
-
-        {/* Reset Demo Data Button */}
-        <button
-          onClick={() => {
-            if (window.confirm('Reset data ke pengaturan dan contoh menu default?')) {
-              onResetDemo();
-            }
-          }}
-          title="Reset ke data awal"
-          className="p-1.5 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white border border-slate-700 transition-colors"
-        >
-          <RotateCcw className="w-3.5 h-3.5" />
         </button>
 
         {/* Logout from Admin */}

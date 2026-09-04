@@ -372,27 +372,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
         {/* Action Controls */}
         <div className="flex items-center gap-2">
-          {onPublish && (
-            <button
-              onClick={onPublish}
-              disabled={isPublishing}
-              title="Publikasikan semua perubahan menu & tema agar langsung berubah di tampilan pegawai"
-              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-md bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold shadow-sm transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-75"
-            >
-              {isPublishing ? (
-                <>
-                  <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  <span>Memposting...</span>
-                </>
-              ) : (
-                <>
-                  <Send className="w-3.5 h-3.5 text-emerald-100" />
-                  <span>Posting / Update Portal</span>
-                </>
-              )}
-            </button>
-          )}
-
           <button
             onClick={() => setShowLiveSidePreview(!showLiveSidePreview)}
             className={`hidden xl:flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium border transition-all ${
@@ -467,7 +446,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </div>
                 <p className="text-xs text-slate-600 mt-1 max-w-2xl">
                   {hasUnpublishedChanges
-                    ? 'Pegawai yang membuka link saat ini masih melihat versi lama sampai Anda menekan tombol "Posting Sekarang ke Pegawai". Klik tombol di samping untuk langsung memperbarui.'
+                    ? 'Terdapat perubahan yang belum diposting. Tekan tombol "Posting / Update Portal" pada bilah atas untuk langsung mempublikasikannya ke seluruh pegawai.'
                     : 'Semua perubahan menu dan profil kustom Anda sudah aktif di Cloud Firestore. Setiap pegawai yang membuka link akan langsung melihat tampilan ini.'}
                 </p>
               </div>
@@ -497,31 +476,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <Share2 className="w-3.5 h-3.5 text-indigo-600" />
                 <span>{copiedShareLink ? 'Link Tersalin!' : 'Salin Link Pegawai'}</span>
               </button>
-
-              {onPublish && (
-                <button
-                  type="button"
-                  onClick={onPublish}
-                  disabled={isPublishing}
-                  className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-bold text-white shadow-sm transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-75 ${
-                    hasUnpublishedChanges
-                      ? 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 ring-2 ring-emerald-400/40 animate-pulse'
-                      : 'bg-emerald-600 hover:bg-emerald-700'
-                  }`}
-                >
-                  {isPublishing ? (
-                    <>
-                      <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      <span>Memposting ke Cloud...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Send className="w-3.5 h-3.5" />
-                      <span>Posting Sekarang ke Pegawai</span>
-                    </>
-                  )}
-                </button>
-              )}
             </div>
           </div>
         </div>

@@ -602,23 +602,6 @@ export default function App() {
     }
   };
 
-  const handleResetDemo = () => {
-    setMenus(INITIAL_MENUS);
-    setProfile(INITIAL_PROFILE);
-    setLiveMenus(INITIAL_MENUS);
-    setLiveProfile(INITIAL_PROFILE);
-    setLogs(INITIAL_CLICK_LOGS);
-    setAdminPin('admin123');
-    setLastPublishedAt(new Date().toISOString());
-    localStorage.removeItem(LOCAL_STORAGE_MENUS_KEY);
-    localStorage.removeItem(LOCAL_STORAGE_PROFILE_KEY);
-    localStorage.removeItem(LOCAL_STORAGE_LIVE_MENUS_KEY);
-    localStorage.removeItem(LOCAL_STORAGE_LIVE_PROFILE_KEY);
-    localStorage.removeItem(LOCAL_STORAGE_LAST_PUBLISHED_KEY);
-    localStorage.removeItem(LOCAL_STORAGE_LOGS_KEY);
-    localStorage.removeItem(LOCAL_STORAGE_ADMIN_PIN_KEY);
-  };
-
   const totalClicks = menus.reduce((acc, m) => acc + (m.clickCount || 0), 0);
 
   return (
@@ -629,7 +612,6 @@ export default function App() {
           currentView={currentView}
           setCurrentView={setCurrentView}
           onOpenQR={() => setIsQRModalOpen(true)}
-          onResetDemo={handleResetDemo}
           onLogout={handleAdminLogout}
           onPublish={handlePublishLive}
           isPublishing={isPublishing}
@@ -737,14 +719,9 @@ export default function App() {
                     <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                     Pratinjau Hasil Edit
                   </span>
-                  <button
-                    onClick={handlePublishLive}
-                    disabled={isPublishing}
-                    className="flex items-center gap-1 px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[11px] font-semibold transition-colors"
-                  >
-                    <Send className="w-3 h-3" />
-                    <span>Posting Live</span>
-                  </button>
+                  <span className="text-[11px] text-slate-400 font-medium">
+                    (Mode Pratinjau Interaktif)
+                  </span>
                 </div>
                 <PublicMicrosite
                   profile={profile}
