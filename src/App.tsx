@@ -388,11 +388,53 @@ export default function App() {
   // Real-time Cloud Sync for WFA Submissions
   useEffect(() => {
     const unsubscribe = subscribeToWfaSubmissions((cloudSubmissions) => {
-      if (cloudSubmissions && cloudSubmissions.length > 0) {
+      if (Array.isArray(cloudSubmissions)) {
         setWfaSubmissions(cloudSubmissions);
       }
     });
     return () => unsubscribe();
+  }, []);
+
+  // Multi-tab sync channel for WFA operations
+  useEffect(() => {
+    let wfaChannel: BroadcastChannel | null = null;
+    if (typeof BroadcastChannel !== 'undefined') {
+      try {
+        wfaChannel = new BroadcastChannel('wfa_sync_channel');
+        wfaChannel.onmessage = (event) => {
+          if (event.data?.type === 'WFA_DELETE' && event.data.id) {
+            setWfaSubmissions((prev) => prev.filter((s) => s.id !== event.data.id));
+          } else if (event.data?.type === 'WFA_STATUS_UPDATE' && event.data.id) {
+            setWfaSubmissions((prev) =>
+              prev.map((sub) =>
+                sub.id === event.data.id
+                  ? {
+                      ...sub,
+                      status: event.data.status,
+                      catatanPengelola: event.data.notes !== undefined ? event.data.notes : sub.catatanPengelola,
+                      validatedAt: new Date().toISOString(),
+                      validatedBy: 'Tim OSDM Poltekkes',
+                    }
+                  : sub
+              )
+            );
+          } else if (event.data?.type === 'WFA_NEW' && event.data.submission) {
+            setWfaSubmissions((prev) => [
+              event.data.submission,
+              ...prev.filter((s) => s.id !== event.data.submission.id),
+            ]);
+          }
+        };
+      } catch (err) {
+        console.warn('WFA BroadcastChannel setup error:', err);
+      }
+    }
+
+    return () => {
+      if (wfaChannel) {
+        wfaChannel.close();
+      }
+    };
   }, []);
 
   // Sync WFA Submissions to localStorage
@@ -446,7 +488,16 @@ export default function App() {
       if (res.success && res.submission) {
         const newSub = res.submission;
         setWfaSubmissions((prev) => [newSub, ...prev.filter((s) => s.id !== newSub.id)]);
-        return { success: true };
+        
+        try {
+          if (typeof BroadcastChannel !== 'undefined') {
+            const bc = new BroadcastChannel('wfa_sync_channel');
+            bc.postMessage({ type: 'WFA_NEW', submission: newSub });
+            bc.close();
+          }
+        } catch {}
+
+        return { success: true, submission: newSub };
       }
       throw new Error(res.error || 'Gagal menyimpan ke server');
     } catch (err: any) {
@@ -458,54 +509,79 @@ export default function App() {
         createdAt: new Date().toISOString(),
       };
       setWfaSubmissions((prev) => [localSub, ...prev]);
-      return { success: true };
+
+      try {
+        if (typeof BroadcastChannel !== 'undefined') {
+          const bc = new BroadcastChannel('wfa_sync_channel');
+          bc.postMessage({ type: 'WFA_NEW', submission: localSub });
+          bc.close();
+        }
+      } catch {}
+
+      return { success: true, submission: localSub };
     }
   };
 
   const handleUpdateWfaStatus = async (id: string, status: WfaValidationStatus, notes?: string) => {
+    // 1. Optimistically update local state immediately
+    setWfaSubmissions((prev) =>
+      prev.map((sub) =>
+        sub.id === id
+          ? {
+              ...sub,
+              status,
+              catatanPengelola: notes !== undefined ? notes : sub.catatanPengelola,
+              validatedAt: new Date().toISOString(),
+              validatedBy: 'Tim OSDM Poltekkes',
+            }
+          : sub
+      )
+    );
+
+    // 2. Broadcast immediately across open tabs
+    try {
+      if (typeof BroadcastChannel !== 'undefined') {
+        const bc = new BroadcastChannel('wfa_sync_channel');
+        bc.postMessage({ type: 'WFA_STATUS_UPDATE', id, status, notes });
+        bc.close();
+      }
+    } catch {}
+
+    // 3. Persist to Cloud Firestore
     try {
       await updateWfaStatusInCloud(id, status, notes, 'Tim OSDM Poltekkes');
-      setWfaSubmissions((prev) =>
-        prev.map((sub) =>
-          sub.id === id
-            ? {
-                ...sub,
-                status,
-                catatanPengelola: notes !== undefined ? notes : sub.catatanPengelola,
-                validatedAt: new Date().toISOString(),
-                validatedBy: 'Tim OSDM Poltekkes',
-              }
-            : sub
-        )
-      );
       return { success: true };
     } catch (err: any) {
-      console.error('Cloud WFA update status failed, saving locally:', err);
-      setWfaSubmissions((prev) =>
-        prev.map((sub) =>
-          sub.id === id
-            ? {
-                ...sub,
-                status,
-                catatanPengelola: notes !== undefined ? notes : sub.catatanPengelola,
-                validatedAt: new Date().toISOString(),
-                validatedBy: 'Tim OSDM Poltekkes',
-              }
-            : sub
-        )
-      );
+      console.error('Cloud WFA update status failed, kept locally:', err);
       return { success: true };
     }
   };
 
   const handleDeleteWfaSubmission = async (id: string) => {
+    // 1. Optimistically remove from state immediately
+    setWfaSubmissions((prev) => {
+      const filtered = prev.filter((s) => s.id !== id);
+      try {
+        localStorage.setItem(LOCAL_STORAGE_WFA_SUBMISSIONS_KEY, JSON.stringify(filtered));
+      } catch {}
+      return filtered;
+    });
+
+    // 2. Broadcast immediately across open tabs
+    try {
+      if (typeof BroadcastChannel !== 'undefined') {
+        const bc = new BroadcastChannel('wfa_sync_channel');
+        bc.postMessage({ type: 'WFA_DELETE', id });
+        bc.close();
+      }
+    } catch {}
+
+    // 3. Delete from Cloud Firestore
     try {
       await deleteWfaSubmissionInCloud(id);
-      setWfaSubmissions((prev) => prev.filter((s) => s.id !== id));
       return { success: true };
     } catch (err: any) {
-      console.error('Cloud WFA delete failed, removing locally:', err);
-      setWfaSubmissions((prev) => prev.filter((s) => s.id !== id));
+      console.error('Cloud WFA delete failed, removed locally:', err);
       return { success: true };
     }
   };

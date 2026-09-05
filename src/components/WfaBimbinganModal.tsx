@@ -362,9 +362,9 @@ export const WfaBimbinganModal: React.FC<WfaBimbinganModalProps> = ({
     }
   };
 
-  // Real-time synchronization for check status screen when admin updates status
+  // Real-time synchronization for check status screen when admin updates status or deletes data
   useEffect(() => {
-    if (checkResult?.searched && checkResult.submission && checkNip && checkTanggal) {
+    if (checkResult?.searched && checkNip && checkTanggal) {
       const cleanInputNip = checkNip.replace(/[\s.-]/g, '').trim();
       const cleanDate = checkTanggal.trim();
 
@@ -406,9 +406,16 @@ export const WfaBimbinganModal: React.FC<WfaBimbinganModalProps> = ({
             isPendingState: true,
           });
         }
+      } else {
+        // Submission has been deleted by admin or removed from database
+        setCheckResult({
+          searched: true,
+          found: false,
+          statusText: 'Data pengajuan tidak ditemukan. Pengajuan Anda mungkin telah dihapus oleh pengelola kepegawaian (OSDM) atau belum terdaftar.',
+        });
       }
     }
-  }, [allSubmissions, checkNip, checkTanggal]);
+  }, [allSubmissions, checkNip, checkTanggal, checkResult?.searched]);
 
   if (!isOpen) return null;
 
@@ -1107,9 +1114,15 @@ export const WfaBimbinganModal: React.FC<WfaBimbinganModalProps> = ({
             {activeTab === 'check' && (
               <div className="space-y-6 max-w-3xl mx-auto">
                 <div className="p-6 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-4 shadow-md">
-                  <div className="flex items-center gap-2.5 text-emerald-400 text-sm font-bold border-b border-slate-800 pb-3">
-                    <Search className="w-4 h-4" />
-                    <span>Pengecekan Status Pengajuan WFA Bimbingan</span>
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-3">
+                    <div className="flex items-center gap-2.5 text-emerald-400 text-sm font-bold">
+                      <Search className="w-4 h-4" />
+                      <span>Pengecekan Status Pengajuan WFA Bimbingan</span>
+                    </div>
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                      <span>Server OSDM Terhubung (Real-time)</span>
+                    </span>
                   </div>
                   <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
                     Masukkan NIP dan Tanggal WFA Anda untuk memverifikasi apakah pengajuan telah divalidasi oleh tim kerja OSDM Poltekkes Kemenkes Bandung.
@@ -1405,17 +1418,19 @@ export const WfaBimbinganModal: React.FC<WfaBimbinganModalProps> = ({
                       </div>
                     )}
 
-                    {/* CONDITION 4: NOT FOUND */}
+                    {/* CONDITION 4: NOT FOUND / TELAH DIHAPUS */}
                     {!checkResult.found && (
                       <div className="p-6 sm:p-8 rounded-3xl bg-slate-950 border border-slate-800 text-center space-y-3">
-                        <AlertCircle className="w-12 h-12 text-slate-400 mx-auto" />
+                        <div className="w-12 h-12 rounded-full bg-slate-800/80 border border-slate-700 flex items-center justify-center mx-auto text-slate-400">
+                          <AlertCircle className="w-6 h-6" />
+                        </div>
                         <h4 className="text-sm sm:text-base font-bold text-slate-200">
                           Data Pengajuan Tidak Ditemukan
                         </h4>
                         <p className="text-xs sm:text-sm text-slate-400 max-w-md mx-auto leading-relaxed">
-                          Tidak ditemukan berkas pengajuan WFA untuk NIP <span className="font-mono font-bold text-white">{checkNip}</span> pada tanggal <span className="font-bold text-white">{checkTanggal}</span>. Pastikan nomor NIP dan tanggal sudah sesuai.
+                          Tidak ditemukan berkas pengajuan WFA untuk NIP <span className="font-mono font-bold text-white">{checkNip}</span> pada tanggal <span className="font-bold text-white">{checkTanggal}</span>. Berkas pengajuan mungkin telah <span className="text-amber-300 font-semibold">dihapus / dibatalkan oleh pengelola kepegawaian (OSDM)</span> atau belum diajukan.
                         </p>
-                        <div className="pt-2">
+                        <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-2.5">
                           <button
                             type="button"
                             onClick={() => {
@@ -1423,9 +1438,17 @@ export const WfaBimbinganModal: React.FC<WfaBimbinganModalProps> = ({
                               setTanggalWfa(checkTanggal);
                               setActiveTab('form');
                             }}
-                            className="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-400 font-bold text-xs transition-all border border-slate-700"
+                            className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition-all shadow-md flex items-center justify-center gap-2 active:scale-95 cursor-pointer"
                           >
-                            + Ajukan Jadwal WFA Sekarang
+                            <span>+ Ajukan Jadwal WFA Baru</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleCheckStatus}
+                            className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs transition-all border border-slate-700 flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"
+                          >
+                            <RotateCcw className="w-3.5 h-3.5" />
+                            <span>Cek Ulang Server</span>
                           </button>
                         </div>
                       </div>

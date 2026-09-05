@@ -171,10 +171,18 @@ export const WfaMonitoringView: React.FC<WfaMonitoringViewProps> = ({
     if (!onDeleteSubmission) return;
     setIsProcessingId(id);
     try {
-      await onDeleteSubmission(id);
+      const res = await onDeleteSubmission(id);
       setDeleteConfirmId(null);
+      if (res?.success) {
+        setActionFeedback({
+          id,
+          message: 'Data pengajuan berhasil dihapus permanen dari server & sinkron ke tampilan pegawai.',
+          type: 'success',
+        });
+      }
     } finally {
       setIsProcessingId(null);
+      setTimeout(() => setActionFeedback(null), 3500);
     }
   };
 

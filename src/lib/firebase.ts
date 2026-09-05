@@ -359,10 +359,9 @@ export function subscribeToWfaSubmissions(
 ) {
   try {
     const colRef = collection(db, WFA_COLLECTION);
-    const q = query(colRef, orderBy('createdAt', 'desc'), limit(200));
 
     return onSnapshot(
-      q,
+      colRef,
       (snapshot) => {
         const list: WfaSubmission[] = [];
         snapshot.forEach((docSnap) => {
@@ -370,11 +369,11 @@ export function subscribeToWfaSubmissions(
           if (d && d.nip && d.tanggalWfa) {
             list.push({
               id: docSnap.id,
-              nip: d.nip,
+              nip: String(d.nip).trim(),
               employeeName: d.employeeName || '',
               unitKerja: d.unitKerja || '',
               jabatan: d.jabatan || '',
-              tanggalWfa: d.tanggalWfa,
+              tanggalWfa: String(d.tanggalWfa).trim(),
               namaKegiatan: d.namaKegiatan || '',
               lokasiKegiatan: d.lokasiKegiatan || 'Kota Bandung',
               lokasiLahanBimbingan: d.lokasiLahanBimbingan || '',
@@ -388,6 +387,14 @@ export function subscribeToWfaSubmissions(
             });
           }
         });
+
+        // Robust in-memory sorting by createdAt descending
+        list.sort((a, b) => {
+          const timeA = new Date(a.createdAt || 0).getTime();
+          const timeB = new Date(b.createdAt || 0).getTime();
+          return timeB - timeA;
+        });
+
         onUpdate(list);
       },
       (err) => {
