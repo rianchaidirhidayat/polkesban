@@ -638,7 +638,7 @@ export const WfaBimbinganModal: React.FC<WfaBimbinganModalProps> = ({
                       <textarea
                         id={`${formId}-nama-kegiatan`}
                         rows={2}
-                        placeholder="Contoh: Bimbingan Praktik Klinik Mahasiswa Kebidanan di RSUP Hasan Sadikin..."
+                        placeholder="Contoh: Bimbingan Praktik Klinik Mahasiswa Kebidanan"
                         value={namaKegiatan}
                         onChange={(e) => {
                           setNamaKegiatan(e.target.value);
@@ -864,7 +864,7 @@ export const WfaBimbinganModal: React.FC<WfaBimbinganModalProps> = ({
                       <input
                         id={`${formId}-link-surat-tugas`}
                         type="url"
-                        placeholder="https://srikandi.arsip.go.id/... atau tautan Google Drive surat tugas resmi"
+                        placeholder="https://tautan Google Drive surat tugas resmi"
                         value={linkSuratTugas}
                         onChange={(e) => {
                           setLinkSuratTugas(e.target.value);
@@ -873,7 +873,7 @@ export const WfaBimbinganModal: React.FC<WfaBimbinganModalProps> = ({
                         className="w-full px-4 py-2.5 rounded-xl bg-slate-950/80 border border-slate-700 text-slate-100 text-xs sm:text-sm font-mono focus:outline-none focus:border-emerald-500 placeholder:text-slate-500"
                       />
                       <p className="text-[11px] text-slate-400">
-                        Salin tautan dokumen surat tugas (Aplikasi SRIKANDI atau Cloud Drive).
+                        Salin tautan dokumen surat tugas (Google Drive).
                       </p>
                     </div>
 
@@ -983,7 +983,7 @@ export const WfaBimbinganModal: React.FC<WfaBimbinganModalProps> = ({
                           
                           {/* Required exact phrasing */}
                           <h3 className="text-base sm:text-lg font-black text-white leading-snug">
-                            pengajuan WFA anda pada tanggal tersebut sudah &quot;VALID dan Sudah terjadwal WFA&quot;
+                            pengajuan WFA anda telah &quot;VALID dan Sudah terjadwal WFA&quot;
                           </h3>
                         </div>
 
@@ -1085,7 +1085,7 @@ export const WfaBimbinganModal: React.FC<WfaBimbinganModalProps> = ({
 
                         <div className="pt-2">
                           <a
-                            href="https://wa.me/6281234567890?text=Halo%20Tim%20Kerja%20OSDM%20Poltekkes%20Bandung,%20mohon%20konfirmasi%20validasi%20pengajuan%20WFA%20Bimbingan%20saya"
+                            href="https://wa.me/628119712525?text=Halo%20Tim%20Kerja%20OSDM%20Poltekkes%20Bandung,%20mohon%20konfirmasi%20validasi%20pengajuan%20WFA%20Bimbingan%20saya"
                             target="_blank"
                             rel="noopener noreferrer"
                             className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition-all shadow-md"
