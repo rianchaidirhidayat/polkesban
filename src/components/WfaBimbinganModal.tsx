@@ -10,6 +10,8 @@ import {
   CheckCircle2,
   Clock,
   AlertCircle,
+  XCircle,
+  AlertTriangle,
   ExternalLink,
   Sparkles,
   Building2,
@@ -84,6 +86,7 @@ export const WfaBimbinganModal: React.FC<WfaBimbinganModalProps> = ({
     statusText?: string;
     isSuccessState?: boolean;
     isPendingState?: boolean;
+    isRejectedState?: boolean;
   } | null>(null);
 
   // Calculate allowed date boundaries (Hari H s/d H+3 kalender, tidak boleh tanggal mundur)
@@ -309,19 +312,27 @@ export const WfaBimbinganModal: React.FC<WfaBimbinganModalProps> = ({
     const cleanInputNip = checkNip.replace(/[\s.-]/g, '').trim();
     const cleanDate = checkTanggal.trim();
 
-    // Match in submissions
-    const matched = allSubmissions.find((item) => {
+    // Match all submissions for this NIP and Date
+    const matches = allSubmissions.filter((item) => {
       const itemNip = item.nip.replace(/[\s.-]/g, '').trim();
       return itemNip === cleanInputNip && item.tanggalWfa === cleanDate;
     });
 
-    if (!matched) {
+    if (matches.length === 0) {
       setCheckResult({
         searched: true,
         found: false,
       });
       return;
     }
+
+    // Sort to prioritize latest status update/creation
+    const sorted = [...matches].sort((a, b) => {
+      const timeA = new Date(a.createdAt || 0).getTime();
+      const timeB = new Date(b.createdAt || 0).getTime();
+      return timeB - timeA;
+    });
+    const matched = sorted[0];
 
     if (matched.status === 'Valid') {
       setCheckResult({
@@ -331,8 +342,16 @@ export const WfaBimbinganModal: React.FC<WfaBimbinganModalProps> = ({
         statusText: 'pengajuan WFA anda pada tanggal tersebut sudah "VALID dan Sudah terjadwal WFA"',
         isSuccessState: true,
       });
+    } else if (matched.status === 'Ditolak') {
+      setCheckResult({
+        searched: true,
+        found: true,
+        submission: matched,
+        statusText: 'Pengajuan WFA Anda pada tanggal tersebut DITOLAK oleh pengelola kepegawaian (OSDM)',
+        isRejectedState: true,
+      });
     } else {
-      // Pending or other non-valid state
+      // Pending / Menunggu Validasi
       setCheckResult({
         searched: true,
         found: true,
@@ -342,6 +361,54 @@ export const WfaBimbinganModal: React.FC<WfaBimbinganModalProps> = ({
       });
     }
   };
+
+  // Real-time synchronization for check status screen when admin updates status
+  useEffect(() => {
+    if (checkResult?.searched && checkResult.submission && checkNip && checkTanggal) {
+      const cleanInputNip = checkNip.replace(/[\s.-]/g, '').trim();
+      const cleanDate = checkTanggal.trim();
+
+      const matches = allSubmissions.filter((item) => {
+        const itemNip = item.nip.replace(/[\s.-]/g, '').trim();
+        return itemNip === cleanInputNip && item.tanggalWfa === cleanDate;
+      });
+
+      if (matches.length > 0) {
+        const sorted = [...matches].sort((a, b) => {
+          const timeA = new Date(a.createdAt || 0).getTime();
+          const timeB = new Date(b.createdAt || 0).getTime();
+          return timeB - timeA;
+        });
+        const matched = sorted[0];
+
+        if (matched.status === 'Valid') {
+          setCheckResult({
+            searched: true,
+            found: true,
+            submission: matched,
+            statusText: 'pengajuan WFA anda pada tanggal tersebut sudah "VALID dan Sudah terjadwal WFA"',
+            isSuccessState: true,
+          });
+        } else if (matched.status === 'Ditolak') {
+          setCheckResult({
+            searched: true,
+            found: true,
+            submission: matched,
+            statusText: 'Pengajuan WFA Anda pada tanggal tersebut DITOLAK oleh pengelola kepegawaian (OSDM)',
+            isRejectedState: true,
+          });
+        } else {
+          setCheckResult({
+            searched: true,
+            found: true,
+            submission: matched,
+            statusText: 'pengajuan anda masih dalam proses, silahkan hubungi tim kerja OSDM',
+            isPendingState: true,
+          });
+        }
+      }
+    }
+  }, [allSubmissions, checkNip, checkTanggal]);
 
   if (!isOpen) return null;
 
@@ -1226,7 +1293,119 @@ export const WfaBimbinganModal: React.FC<WfaBimbinganModalProps> = ({
                       </div>
                     )}
 
-                    {/* CONDITION 3: NOT FOUND */}
+                    {/* CONDITION 3: STATUS DITOLAK / TIDAK DISETUJUI */}
+                    {checkResult.isRejectedState && checkResult.submission && (
+                      <div className="p-6 sm:p-8 rounded-3xl bg-rose-950/50 border-2 border-rose-500/70 shadow-2xl text-center space-y-4">
+                        <div className="w-14 h-14 rounded-full bg-rose-500/20 border border-rose-400 text-rose-400 flex items-center justify-center mx-auto shadow-sm">
+                          <XCircle className="w-8 h-8" />
+                        </div>
+
+                        <div>
+                          <span className="inline-flex items-center gap-1.5 px-4 py-1 rounded-full bg-rose-600 text-white font-black text-xs uppercase tracking-wider mb-2 shadow-sm">
+                            ❌ STATUS RESMI: PENGAJUAN DITOLAK
+                          </span>
+
+                          <h3 className="text-base sm:text-xl font-black text-white leading-snug">
+                            Pengajuan WFA Anda pada tanggal tersebut DITOLAK
+                          </h3>
+                          <p className="text-xs sm:text-sm text-rose-200 mt-1 max-w-lg mx-auto leading-relaxed">
+                            Pengajuan tidak disetujui oleh pengelola kepegawaian (Tim Kerja OSDM Poltekkes Kemenkes Bandung).
+                          </p>
+                        </div>
+
+                        {/* Reason / Catatan Pengelola Box */}
+                        <div className="p-4 sm:p-5 rounded-2xl bg-slate-950/90 border border-rose-500/40 text-left space-y-2.5 max-w-xl mx-auto shadow-inner">
+                          <div className="flex items-center gap-2 text-rose-400 font-bold text-xs uppercase tracking-wider pb-1 border-b border-rose-900/60">
+                            <AlertTriangle className="w-4 h-4 shrink-0" />
+                            <span>Catatan &amp; Alasan Penolakan dari Admin OSDM:</span>
+                          </div>
+                          <p className="text-xs sm:text-sm font-semibold text-rose-100 bg-rose-950/40 p-3 rounded-xl border border-rose-900/50 leading-relaxed">
+                            &quot;{checkResult.submission.catatanPengelola || 'Pengajuan berkas belum memenuhi persyaratan atau tidak sesuai ketentuan WFA Bimbingan. Silakan hubungi tim kerja OSDM untuk informasi lebih lanjut.'}&quot;
+                          </p>
+                          {checkResult.submission.validatedAt && (
+                            <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1">
+                              <span>Waktu Peninjauan:</span>
+                              <span className="font-mono text-slate-300">
+                                {new Date(checkResult.submission.validatedAt).toLocaleString('id-ID')}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Submission details card */}
+                        <div className="p-5 rounded-2xl bg-slate-950/80 border border-slate-800 text-left text-xs sm:text-sm space-y-2.5 max-w-xl mx-auto shadow-inner">
+                          <div className="flex justify-between border-b border-slate-800 pb-2 text-slate-400">
+                            <span>Nama Pegawai:</span>
+                            <span className="font-bold text-white">{checkResult.submission.employeeName}</span>
+                          </div>
+                          <div className="flex justify-between border-b border-slate-800 pb-2 text-slate-400">
+                            <span>NIP:</span>
+                            <span className="font-mono text-white">{checkResult.submission.nip}</span>
+                          </div>
+                          <div className="flex justify-between border-b border-slate-800 pb-2 text-slate-400">
+                            <span>Tanggal Pengajuan WFA:</span>
+                            <span className="font-semibold text-rose-300">{checkResult.submission.tanggalWfa}</span>
+                          </div>
+                          <div className="flex justify-between border-b border-slate-800 pb-2 text-slate-400">
+                            <span>Lokasi &amp; Jadwal:</span>
+                            <span className="font-medium text-slate-300">
+                              {checkResult.submission.lokasiKegiatan} — {checkResult.submission.statusWfa}
+                            </span>
+                          </div>
+                          <div className="flex justify-between border-b border-slate-800 pb-2 text-slate-400">
+                            <span>Lahan Bimbingan:</span>
+                            <span className="font-medium text-slate-300 truncate max-w-[240px] sm:max-w-[320px]">
+                              {checkResult.submission.lokasiLahanBimbingan || '-'}
+                            </span>
+                          </div>
+                          <div className="flex justify-between text-slate-400 pt-0.5">
+                            <span>Status Sistem:</span>
+                            <span className="font-bold text-rose-400">Ditolak / Perlu Pengajuan Ulang</span>
+                          </div>
+                        </div>
+
+                        {/* Action Buttons: Ajukan Ulang / Hubungi WA */}
+                        <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3 max-w-xl mx-auto">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (checkResult.submission) {
+                                setNip(checkResult.submission.nip);
+                                setEmployeeName(checkResult.submission.employeeName);
+                                setUnitKerja(checkResult.submission.unitKerja || '');
+                                setJabatan(checkResult.submission.jabatan || '');
+                                setTanggalWfa(checkResult.submission.tanggalWfa);
+                                setNamaKegiatan(checkResult.submission.namaKegiatan);
+                                setLokasiKegiatan(checkResult.submission.lokasiKegiatan);
+                                setLokasiLahanBimbingan(checkResult.submission.lokasiLahanBimbingan);
+                                setLinkSuratTugas(checkResult.submission.linkSuratTugas);
+                                setIsEmployeeFound(true);
+                                setActiveTab('form');
+                                setErrorMessage(null);
+                              }
+                            }}
+                            className="w-full sm:w-auto px-5 py-3 rounded-2xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs sm:text-sm transition-all shadow-md flex items-center justify-center gap-2 active:scale-95 cursor-pointer"
+                          >
+                            <RotateCcw className="w-4 h-4" />
+                            <span>Ajukan Ulang / Perbaiki Berkas</span>
+                          </button>
+
+                          <a
+                            href={`https://wa.me/${waLinkNumber}?text=${encodeURIComponent(
+                              `Halo Tim Kerja OSDM Poltekkes Bandung, saya ${checkResult.submission.employeeName} (NIP: ${checkResult.submission.nip}) ingin konfirmasi dan klarifikasi mengenai pengajuan WFA Bimbingan saya pada tanggal ${checkResult.submission.tanggalWfa} yang berstatus DITOLAK (Catatan: "${checkResult.submission.catatanPengelola || '-'}"). Mohon petunjuk perbaikannya. Terima kasih.`
+                            )}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="w-full sm:w-auto px-5 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs sm:text-sm transition-all shadow-md flex items-center justify-center gap-2 active:scale-95 cursor-pointer"
+                          >
+                            <MessageCircle className="w-4 h-4" />
+                            <span>Hubungi OSDM via WhatsApp</span>
+                          </a>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* CONDITION 4: NOT FOUND */}
                     {!checkResult.found && (
                       <div className="p-6 sm:p-8 rounded-3xl bg-slate-950 border border-slate-800 text-center space-y-3">
                         <AlertCircle className="w-12 h-12 text-slate-400 mx-auto" />

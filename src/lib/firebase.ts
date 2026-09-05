@@ -456,7 +456,7 @@ export async function updateWfaStatusInCloud(
       updatedAt: serverTimestamp(),
     };
 
-    if (status === 'Valid') {
+    if (status === 'Valid' || status === 'Ditolak') {
       updates.validatedAt = now;
       updates.validatedBy = validatedBy;
     } else if (status === 'Menunggu Validasi') {

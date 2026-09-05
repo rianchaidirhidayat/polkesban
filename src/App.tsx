@@ -224,6 +224,11 @@ export default function App() {
       if (e.key === LOCAL_STORAGE_LAST_PUBLISHED_KEY && e.newValue) {
         setLastPublishedAt(e.newValue);
       }
+      if (e.key === LOCAL_STORAGE_WFA_SUBMISSIONS_KEY && e.newValue) {
+        try {
+          setWfaSubmissions(JSON.parse(e.newValue));
+        } catch {}
+      }
     };
     window.addEventListener('storage', handleStorageChange);
 
