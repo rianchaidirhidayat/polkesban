@@ -101,6 +101,15 @@ export const PublicMicrosite: React.FC<PublicMicrositeProps> = ({
     onMenuClick(menu);
   };
 
+  const isWfaMenu = (menu: MenuItem) => {
+    return (
+      menu.id === 'menu-wfa-bimbingan' ||
+      menu.url === '#wfa-bimbingan' ||
+      menu.title?.toLowerCase().includes('wfa bimbingan') ||
+      menu.title?.toLowerCase().includes('formulir pengajuan wfa')
+    );
+  };
+
   // Handle menu click - intercepts PIN protected menus
   const handleButtonClick = (menu: MenuItem) => {
     if (menu.isProtected && menu.pinCode && menu.pinCode.trim() !== '') {
@@ -109,12 +118,7 @@ export const PublicMicrosite: React.FC<PublicMicrositeProps> = ({
     }
 
     // Intercept Formulir Pengajuan WFA Bimbingan to show floating modal
-    if (
-      menu.id === 'menu-wfa-bimbingan' ||
-      menu.url === '#wfa-bimbingan' ||
-      menu.title?.toLowerCase().includes('wfa bimbingan') ||
-      menu.title?.toLowerCase().includes('formulir pengajuan wfa')
-    ) {
+    if (isWfaMenu(menu)) {
       onMenuClick(menu);
       setIsWfaModalOpen(true);
       return;
@@ -125,8 +129,15 @@ export const PublicMicrosite: React.FC<PublicMicrositeProps> = ({
 
   // Called when employee enters correct PIN
   const handlePinSuccess = (verifiedMenu: MenuItem) => {
+    setPinModalMenu(null);
     executeMenuAction(verifiedMenu);
-    if (verifiedMenu.url) {
+
+    if (isWfaMenu(verifiedMenu)) {
+      setIsWfaModalOpen(true);
+      return;
+    }
+
+    if (verifiedMenu.url && verifiedMenu.url !== '#wfa-bimbingan') {
       window.open(verifiedMenu.url, verifiedMenu.openInNewTab ? '_blank' : '_self', 'noopener,noreferrer');
     }
   };
@@ -555,6 +566,7 @@ export const PublicMicrosite: React.FC<PublicMicrositeProps> = ({
         onSubmit={onSubmitWfa || (async () => ({ success: true }))}
         allSubmissions={wfaSubmissions}
         logoUrl={profile.avatarUrl}
+        osdmContactWa={profile.osdmContactWa || '08119712525'}
       />
     </div>
   );

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   CheckCircle2,
@@ -21,7 +21,9 @@ import {
   Sparkles,
   ChevronDown,
   RefreshCw,
-  FileSpreadsheet
+  FileSpreadsheet,
+  MessageCircle,
+  PhoneCall
 } from 'lucide-react';
 import { WfaSubmission, WfaValidationStatus } from '../types';
 
@@ -30,6 +32,8 @@ interface WfaMonitoringViewProps {
   onUpdateStatus: (id: string, status: WfaValidationStatus, notes?: string) => Promise<{ success: boolean; error?: string }>;
   onDeleteSubmission?: (id: string) => Promise<{ success: boolean; error?: string }>;
   onRefresh?: () => void;
+  osdmContactWa?: string;
+  onUpdateOsdmContactWa?: (newWa: string) => void;
 }
 
 export const WfaMonitoringView: React.FC<WfaMonitoringViewProps> = ({
@@ -37,12 +41,30 @@ export const WfaMonitoringView: React.FC<WfaMonitoringViewProps> = ({
   onUpdateStatus,
   onDeleteSubmission,
   onRefresh,
+  osdmContactWa = '08119712525',
+  onUpdateOsdmContactWa,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'All' | WfaValidationStatus>('All');
   const [lokasiFilter, setLokasiFilter] = useState<'All' | 'Kota Bandung' | 'Kabupaten Bandung'>('All');
   const [isProcessingId, setIsProcessingId] = useState<string | null>(null);
   const [actionFeedback, setActionFeedback] = useState<{ id: string; message: string; type: 'success' | 'error' } | null>(null);
+
+  // OSDM WA contact management state
+  const [localWa, setLocalWa] = useState(osdmContactWa);
+  const [waSaveStatus, setWaSaveStatus] = useState<string | null>(null);
+
+  useEffect(() => {
+    setLocalWa(osdmContactWa);
+  }, [osdmContactWa]);
+
+  const handleSaveWa = () => {
+    if (onUpdateOsdmContactWa) {
+      onUpdateOsdmContactWa(localWa.trim());
+      setWaSaveStatus('Nomor WhatsApp Tim Kerja OSDM berhasil diperbarui!');
+      setTimeout(() => setWaSaveStatus(null), 3000);
+    }
+  };
   
   // Rejection notes modal state
   const [rejectModalItem, setRejectModalItem] = useState<WfaSubmission | null>(null);
@@ -298,6 +320,74 @@ export const WfaMonitoringView: React.FC<WfaMonitoringViewProps> = ({
             <span className="text-[11px] font-semibold text-rose-600">Dikembalikan</span>
           </div>
         </div>
+      </div>
+
+      {/* Pengaturan Kontak WhatsApp Tim Kerja OSDM (Layanan Bimbingan WFA) */}
+      <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-emerald-50 via-teal-50/60 to-white border border-emerald-200 shadow-xs">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <div className="p-2 rounded-xl bg-emerald-600 text-white shadow-xs">
+                <MessageCircle className="w-4 h-4" />
+              </div>
+              <h3 className="text-sm font-bold text-slate-900 tracking-tight">
+                Pengaturan Kontak WhatsApp Tim Kerja OSDM (Layanan WFA Bimbingan)
+              </h3>
+            </div>
+            <p className="text-xs text-slate-600 max-w-2xl leading-relaxed">
+              Nomor ini digunakan untuk tombol <strong>&quot;Hubungi Tim Kerja OSDM&quot;</strong> yang muncul di layar pengecekan status pegawai saat pengajuan WFA berstatus <em>&quot;masih dalam proses&quot;</em>. Anda dapat mengganti nomor WhatsApp kapan saja.
+            </p>
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+            <div className="relative">
+              <input
+                type="text"
+                value={localWa}
+                onChange={(e) => setLocalWa(e.target.value)}
+                placeholder="Contoh: 08119712525"
+                className="w-full sm:w-56 px-3.5 py-2 text-xs font-mono font-bold bg-white border border-emerald-300 rounded-xl focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 text-slate-800 shadow-xs"
+              />
+            </div>
+
+            <button
+              type="button"
+              onClick={handleSaveWa}
+              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white text-xs font-bold rounded-xl transition-all shadow-xs flex items-center justify-center gap-1.5 shrink-0"
+            >
+              <Check className="w-3.5 h-3.5" />
+              <span>Simpan Nomor WA</span>
+            </button>
+
+            <a
+              href={`https://wa.me/${
+                localWa.replace(/[^0-9]/g, '').startsWith('0')
+                  ? '62' + localWa.replace(/[^0-9]/g, '').slice(1)
+                  : localWa.replace(/[^0-9]/g, '').startsWith('62')
+                  ? localWa.replace(/[^0-9]/g, '')
+                  : '62' + localWa.replace(/[^0-9]/g, '')
+              }?text=${encodeURIComponent('Tes integrasi kontak OSDM Poltekkes Kemenkes Bandung')}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-3.5 py-2 bg-white hover:bg-slate-100 text-slate-700 text-xs font-semibold rounded-xl border border-slate-200 transition-colors shrink-0 flex items-center justify-center gap-1.5 shadow-xs"
+              title="Uji coba buka chat WhatsApp"
+            >
+              <ExternalLink className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Tes Tautan WA</span>
+            </a>
+          </div>
+        </div>
+
+        {waSaveStatus && (
+          <motion.div
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mt-3 inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-emerald-100/80 border border-emerald-300 text-emerald-800 text-xs font-semibold"
+          >
+            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+            <span>{waSaveStatus}</span>
+          </motion.div>
+        )}
       </div>
 
       {/* Action Notification Alert */}

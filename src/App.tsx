@@ -420,6 +420,22 @@ export default function App() {
   }, []);
 
   const handleCreateWfaSubmission = async (data: Omit<WfaSubmission, 'id' | 'status' | 'createdAt'>) => {
+    // Duplicate rejection: Pegawai tidak boleh mengajukan WFA pada tanggal yang sama dua kali
+    const cleanNip = data.nip.replace(/[\s.-]/g, '').trim();
+    const cleanDate = data.tanggalWfa.trim();
+
+    const isDuplicate = wfaSubmissions.some((sub) => {
+      const subNip = sub.nip.replace(/[\s.-]/g, '').trim();
+      return subNip === cleanNip && sub.tanggalWfa === cleanDate && sub.status !== 'Ditolak';
+    });
+
+    if (isDuplicate) {
+      return {
+        success: false,
+        error: `Pengajuan ditolak: Pegawai dengan NIP ${data.nip} sudah memiliki jadwal pengajuan WFA pada tanggal ${data.tanggalWfa}. Pegawai tidak diperbolehkan mengajukan WFA pada tanggal yang sama dua kali.`,
+      };
+    }
+
     try {
       const res = await createWfaSubmissionInCloud(data);
       if (res.success && res.submission) {

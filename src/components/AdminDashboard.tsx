@@ -1852,6 +1852,52 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   </div>
                 </div>
 
+                {/* OSDM WhatsApp Helpdesk Setting */}
+                <div className="p-6 bg-white border border-slate-200 rounded-xl space-y-4 shadow-xs">
+                  <div className="flex items-center gap-3 pb-3 border-b border-slate-100">
+                    <div className="p-2 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-100">
+                      <MessageCircle className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-bold text-slate-900 tracking-tight">
+                        Nomor WhatsApp Tim Kerja OSDM (Layanan WFA Bimbingan)
+                      </h3>
+                      <p className="text-xs text-slate-500">
+                        Nomor kontak ini aktif pada tombol &quot;Hubungi Tim Kerja OSDM&quot; di formulir saat pegawai memeriksa status pengajuan WFA yang masih dalam proses
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 pt-1">
+                    <div className="flex-1">
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">
+                        Nomor WhatsApp Helpdesk OSDM
+                      </label>
+                      <input
+                        type="text"
+                        value={profile.osdmContactWa || ''}
+                        placeholder="Contoh: 08119712525"
+                        onChange={(e) => {
+                          setProfile({ ...profile, osdmContactWa: e.target.value });
+                          triggerSaveFeedback();
+                        }}
+                        className="w-full px-3.5 py-2 text-sm font-mono font-bold bg-white border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 placeholder-slate-400"
+                      />
+                    </div>
+                    <div className="sm:self-end">
+                      <a
+                        href={`https://wa.me/${(profile.osdmContactWa || '08119712525').replace(/[^0-9]/g, '').startsWith('0') ? '62' + (profile.osdmContactWa || '08119712525').replace(/[^0-9]/g, '').slice(1) : (profile.osdmContactWa || '08119712525').replace(/[^0-9]/g, '')}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-4 py-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-xs font-bold rounded-lg transition-colors flex items-center justify-center gap-1.5 shadow-xs"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                        <span>Tes Link WA</span>
+                      </a>
+                    </div>
+                  </div>
+                </div>
+
                 {/* Social & Contact Links Management */}
                 <div className="p-6 bg-white border border-slate-200 rounded-xl space-y-5 shadow-xs">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
@@ -2053,6 +2099,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 onUpdateStatus={onUpdateWfaStatus || (async () => ({ success: true }))}
                 onDeleteSubmission={onDeleteWfaSubmission}
                 onRefresh={onRefreshWfa}
+                osdmContactWa={profile.osdmContactWa || '08119712525'}
+                onUpdateOsdmContactWa={(newWa: string) => {
+                  setProfile((prev) => ({
+                    ...prev,
+                    osdmContactWa: newWa,
+                  }));
+                  triggerSaveFeedback();
+                }}
               />
             )}
 

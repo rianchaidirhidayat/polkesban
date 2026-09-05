@@ -110,7 +110,8 @@ export const INITIAL_PROFILE: MicrositeProfile = {
   footerCopyright: '© 2026 OSDM Poltekkes Kemenkes Bandung. Hak Cipta Dilindungi.',
   tabTitle: 'OSDM Poltekkes Kemenkes Bandung - Portal Layanan Pegawai',
   faviconUrl: '',
-  theme: THEME_PRESETS[0]
+  theme: THEME_PRESETS[0],
+  osdmContactWa: '08119712525'
 };
 
 export const INITIAL_MENUS: MenuItem[] = [

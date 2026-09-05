@@ -95,6 +95,7 @@ export interface MicrositeProfile {
   tabTitle?: string;
   faviconUrl?: string;
   theme: ThemeConfig;
+  osdmContactWa?: string;
 }
 
 export interface ClickLog {
