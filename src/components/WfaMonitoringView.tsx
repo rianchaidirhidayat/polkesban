@@ -339,42 +339,47 @@ export const WfaMonitoringView: React.FC<WfaMonitoringViewProps> = ({
             </p>
           </div>
 
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
-            <div className="relative">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 shrink-0">
+            <div className="w-full sm:w-56">
+              <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                Nomor WhatsApp OSDM:
+              </label>
               <input
                 type="text"
                 value={localWa}
                 onChange={(e) => setLocalWa(e.target.value)}
                 placeholder="Contoh: 08119712525"
-                className="w-full sm:w-56 px-3.5 py-2 text-xs font-mono font-bold bg-white border border-emerald-300 rounded-xl focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 text-slate-800 shadow-xs"
+                className="w-full px-3.5 py-2 text-xs font-mono font-bold bg-white border border-emerald-300 rounded-xl focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 text-slate-800 shadow-xs"
               />
             </div>
 
-            <button
-              type="button"
-              onClick={handleSaveWa}
-              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white text-xs font-bold rounded-xl transition-all shadow-xs flex items-center justify-center gap-1.5 shrink-0"
-            >
-              <Check className="w-3.5 h-3.5" />
-              <span>Simpan Nomor WA</span>
-            </button>
+            <div className="flex flex-col gap-1.5 w-full sm:w-auto shrink-0">
+              <button
+                type="button"
+                onClick={handleSaveWa}
+                className="w-full px-4 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white text-xs font-bold rounded-xl transition-all shadow-xs flex items-center justify-center gap-1.5 shrink-0"
+              >
+                <Check className="w-3.5 h-3.5" />
+                <span>Simpan Nomor WA</span>
+              </button>
 
-            <a
-              href={`https://wa.me/${
-                localWa.replace(/[^0-9]/g, '').startsWith('0')
-                  ? '62' + localWa.replace(/[^0-9]/g, '').slice(1)
-                  : localWa.replace(/[^0-9]/g, '').startsWith('62')
-                  ? localWa.replace(/[^0-9]/g, '')
-                  : '62' + localWa.replace(/[^0-9]/g, '')
-              }?text=${encodeURIComponent('Tes integrasi kontak OSDM Poltekkes Kemenkes Bandung')}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="px-3.5 py-2 bg-white hover:bg-slate-100 text-slate-700 text-xs font-semibold rounded-xl border border-slate-200 transition-colors shrink-0 flex items-center justify-center gap-1.5 shadow-xs"
-              title="Uji coba buka chat WhatsApp"
-            >
-              <ExternalLink className="w-3.5 h-3.5 text-emerald-600" />
-              <span>Tes Tautan WA</span>
-            </a>
+              <a
+                href={`https://wa.me/${
+                  localWa.replace(/[^0-9]/g, '').startsWith('0')
+                    ? '62' + localWa.replace(/[^0-9]/g, '').slice(1)
+                    : localWa.replace(/[^0-9]/g, '').startsWith('62')
+                    ? localWa.replace(/[^0-9]/g, '')
+                    : '62' + localWa.replace(/[^0-9]/g, '')
+                }?text=${encodeURIComponent('Tes integrasi kontak OSDM Poltekkes Kemenkes Bandung')}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full px-3.5 py-1.5 bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium rounded-xl border border-slate-200 hover:border-emerald-300 transition-colors shrink-0 flex items-center justify-center gap-1.5 shadow-xs"
+                title="Uji coba buka chat WhatsApp"
+              >
+                <ExternalLink className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Tes Tautan WA</span>
+              </a>
+            </div>
           </div>
         </div>
 
