@@ -437,7 +437,7 @@ export const WfaBimbinganModal: React.FC<WfaBimbinganModalProps> = ({
             searched: true,
             found: true,
             submission: matched,
-            statusText: 'pengajuan anda masih dalam proses, silahkan hubungi tim kerja OSDM',
+            statusText: 'pengajuan anda masih dalam proses verifikasi validasi',
             isPendingState: true,
           });
         }
@@ -1302,7 +1302,7 @@ export const WfaBimbinganModal: React.FC<WfaBimbinganModalProps> = ({
 
                           {/* Required exact phrasing */}
                           <h3 className="text-base sm:text-xl font-black text-white leading-snug">
-                            pengajuan anda masih dalam proses, silahkan hubungi tim kerja OSDM
+                            pengajuan anda masih dalam proses verifikasi validasi
                           </h3>
                         </div>
 
