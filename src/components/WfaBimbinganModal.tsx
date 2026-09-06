@@ -535,7 +535,7 @@ export const WfaBimbinganModal: React.FC<WfaBimbinganModalProps> = ({
                   }`}
                 >
                   <Search className="w-3.5 h-3.5" />
-                  <span>Pengecekan Status</span>
+                  <span>Monitoring Status</span>
                 </button>
               </div>
             </div>
@@ -1155,7 +1155,7 @@ export const WfaBimbinganModal: React.FC<WfaBimbinganModalProps> = ({
                   <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-3">
                     <div className="flex items-center gap-2.5 text-emerald-400 text-sm font-bold">
                       <Search className="w-4 h-4" />
-                      <span>Pengecekan Status Pengajuan WFA Bimbingan</span>
+                      <span>Monitoring Status Pengajuan WFA Bimbingan</span>
                     </div>
                     <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
@@ -1163,7 +1163,7 @@ export const WfaBimbinganModal: React.FC<WfaBimbinganModalProps> = ({
                     </span>
                   </div>
                   <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
-                    Masukkan NIP dan Tanggal WFA Anda untuk memverifikasi apakah pengajuan telah divalidasi oleh tim kerja OSDM Poltekkes Kemenkes Bandung.
+                    Masukkan NIP dan Tanggal WFA Anda untuk mengetahui status pengajuan.
                   </p>
 
                   <form onSubmit={handleCheckStatus} className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
