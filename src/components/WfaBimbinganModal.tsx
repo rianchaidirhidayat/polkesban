@@ -672,7 +672,7 @@ export const WfaBimbinganModal: React.FC<WfaBimbinganModalProps> = ({
                       <div className="flex items-center justify-between border-b border-slate-800 pb-3">
                         <div className="flex items-center gap-2">
                           <UserCheck className="w-4 h-4 text-emerald-400" />
-                          <h4 className="font-bold text-sm text-white">1. Identitas Dosen / Pegawai</h4>
+                          <h4 className="font-bold text-sm text-white">1. Identitas Pegawai</h4>
                         </div>
                         <button
                           type="button"
@@ -680,7 +680,7 @@ export const WfaBimbinganModal: React.FC<WfaBimbinganModalProps> = ({
                           className="text-xs text-emerald-400 hover:text-emerald-300 underline font-medium flex items-center gap-1.5"
                         >
                           <Search className="w-3.5 h-3.5" />
-                          <span>Pilih dari Pangkalan Data Pegawai</span>
+                          <span>Pilih dari Pangkalan Data</span>
                         </button>
                       </div>
 
