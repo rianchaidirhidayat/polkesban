@@ -1,25 +1,31 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { WfaSubmission } from '../types';
+import { getKopSuratDataUrl } from './kopSuratCanvas';
 
 export interface GeneratePdfOptions {
   submissions: WfaSubmission[];
   title?: string;
   subtitle?: string;
   filterLabel?: string;
+  periodLabel?: string;
   generatedBy?: string;
+  customFilename?: string;
 }
 
 /**
  * Generate dan Download Laporan Resmi PDF Dashboard Pengajuan WFA Bimbingan
+ * Menggunakan Kop Surat Resmi Kemenkes & Poltekkes Bandung yang diunggah pengguna.
  */
-export function generateWfaPdfReport({
+export async function generateWfaPdfReport({
   submissions,
   title = 'LAPORAN REKAPITULASI PENGAJUAN WORK FROM ANYWHERE (WFA) BIMBINGAN',
   subtitle = 'PANGKALAN DATA MONITORING & VERIFIKASI PRESENSI TIM KERJA OSDM',
   filterLabel = 'Semua Pengajuan',
+  periodLabel = 'Semua Periode',
   generatedBy = 'Tim Kerja OSDM Poltekkes Kemenkes Bandung',
-}: GeneratePdfOptions): void {
+  customFilename,
+}: GeneratePdfOptions): Promise<void> {
   // A4 Landscape orientation: 297mm x 210mm
   const doc = new jsPDF({
     orientation: 'landscape',
@@ -45,47 +51,52 @@ export function generateWfaPdfReport({
   const locKarawangKota = submissions.filter((s) => s.lokasiKegiatan === 'Kota Karawang').length;
   const locKarawangKab = submissions.filter((s) => s.lokasiKegiatan === 'Kabupaten Karawang').length;
 
-  // 1. KOP SURAT INSTANSI RESMI KEMENKES
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(11);
-  doc.setTextColor(15, 23, 42); // slate-900
-  doc.text('KEMENTERIAN KESEHATAN REPUBLIK INDONESIA', pageWidth / 2, 13, { align: 'center' });
+  // 1. KOP SURAT RESMI KEMENKES POLTEKKES BANDUNG (Gambar Resmi Pengguna)
+  const kopBannerWidth = 260; // Lebar proporsional pada kertas A4 Landscape
+  const kopBannerHeight = 45.2; // Rasio 1150:200
+  const kopBannerX = (pageWidth - kopBannerWidth) / 2;
+  const kopBannerY = 7;
 
-  doc.setFontSize(10);
-  doc.text('DIREKTORAT JENDERAL TENAGA KESEHATAN', pageWidth / 2, 18, { align: 'center' });
+  try {
+    const kopSuratDataUrl = await getKopSuratDataUrl();
+    if (kopSuratDataUrl) {
+      doc.addImage(kopSuratDataUrl, 'PNG', kopBannerX, kopBannerY, kopBannerWidth, kopBannerHeight);
+    }
+  } catch (err) {
+    console.error('Failed to embed Kop Surat image, falling back to vector lines:', err);
+    // Fallback header text if image fails
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.setTextColor(0, 169, 157);
+    doc.text('KEMENTERIAN KESEHATAN REPUBLIK INDONESIA', pageWidth / 2, 13, { align: 'center' });
+    doc.setFontSize(10);
+    doc.setTextColor(74, 74, 74);
+    doc.text('DIREKTORAT JENDERAL SUMBER DAYA MANUSIA KESEHATAN', pageWidth / 2, 18, { align: 'center' });
+    doc.setFontSize(13);
+    doc.setTextColor(0, 169, 157);
+    doc.text('POLTEKKES KEMENKES BANDUNG', pageWidth / 2, 24, { align: 'center' });
+  }
 
-  doc.setFontSize(13);
-  doc.setTextColor(5, 150, 105); // emerald-600
-  doc.text('POLITEKNIK KESEHATAN KEMENKES BANDUNG', pageWidth / 2, 23.5, { align: 'center' });
-
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8.5);
-  doc.setTextColor(71, 85, 105); // slate-600
-  doc.text(
-    'Jl. Pajajaran No. 56 Bandung 40171 • Telp: (022) 4231627 • Email: info@poltekkesbandung.ac.id',
-    pageWidth / 2,
-    28,
-    { align: 'center' }
-  );
-
-  // Garis Kop Ganda (Tebal & Tipis)
-  doc.setDrawColor(5, 150, 105);
+  // Garis Kop Ganda Kedinasan (Teal Kemenkes & Slate)
+  const lineY1 = 53.8;
+  const lineY2 = 55.0;
+  doc.setDrawColor(0, 169, 157); // Teal Kemenkes #00A99D
   doc.setLineWidth(0.8);
-  doc.line(margin, 31, pageWidth - margin, 31);
-  doc.setDrawColor(148, 163, 184);
+  doc.line(margin, lineY1, pageWidth - margin, lineY1);
+  doc.setDrawColor(148, 163, 184); // slate-400
   doc.setLineWidth(0.2);
-  doc.line(margin, 32.2, pageWidth - margin, 32.2);
+  doc.line(margin, lineY2, pageWidth - margin, lineY2);
 
   // 2. JUDUL LAPORAN & METADATA
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(11);
   doc.setTextColor(15, 23, 42);
-  doc.text(title, pageWidth / 2, 38.5, { align: 'center' });
+  doc.text(title, pageWidth / 2, 61.5, { align: 'center' });
 
   doc.setFontSize(8.5);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(100, 116, 139);
-  doc.text(subtitle, pageWidth / 2, 43, { align: 'center' });
+  doc.text(subtitle, pageWidth / 2, 66, { align: 'center' });
 
   // Tanggal cetak & filter
   const todayStr = new Intl.DateTimeFormat('id-ID', {
@@ -94,12 +105,13 @@ export function generateWfaPdfReport({
   }).format(new Date());
 
   doc.setFontSize(8);
-  doc.text(`Dicetak: ${todayStr} WIB`, margin, 49);
-  doc.text(`Kriteria Tampilan: ${filterLabel}`, pageWidth - margin, 49, { align: 'right' });
+  doc.setTextColor(30, 41, 59);
+  doc.text(`Periode: ${periodLabel}   |   Dicetak: ${todayStr} WIB`, margin, 71.5);
+  doc.text(`Kriteria: ${filterLabel}`, pageWidth - margin, 71.5, { align: 'right' });
 
   // 3. MINI DASHBOARD KPI CARDS (4 Boxes across page)
-  const cardY = 52;
-  const cardHeight = 16;
+  const cardY = 74.5;
+  const cardHeight = 15;
   const cardGap = 4;
   const totalWidth = pageWidth - margin * 2;
   const cardWidth = (totalWidth - cardGap * 3) / 4;
@@ -151,19 +163,19 @@ export function generateWfaPdfReport({
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(6.5);
     doc.setTextColor(100, 116, 139);
-    doc.text(kpi.title, x + 3, cardY + 4.5);
+    doc.text(kpi.title, x + 3, cardY + 4.2);
 
     // Value
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(12);
     doc.setTextColor(kpi.textR, kpi.textG, kpi.textB);
-    doc.text(kpi.value, x + 3, cardY + 10.5);
+    doc.text(kpi.value, x + 3, cardY + 10);
 
     // Subtitle
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(6.5);
     doc.setTextColor(100, 116, 139);
-    doc.text(kpi.sub, x + 3, cardY + 14);
+    doc.text(kpi.sub, x + 3, cardY + 13.5);
   });
 
   // Wilayah Breakdown Sub-line
@@ -314,6 +326,6 @@ export function generateWfaPdfReport({
   doc.text('NIP. Verifikator Kedinasan Terlampir', signX, signY + 31.5);
 
   // Save the PDF
-  const filename = `Laporan_WFA_Bimbingan_Poltekkes_${new Date().toISOString().slice(0, 10)}.pdf`;
+  const filename = customFilename || `Laporan_WFA_Bimbingan_Poltekkes_${new Date().toISOString().slice(0, 10)}.pdf`;
   doc.save(filename);
 }

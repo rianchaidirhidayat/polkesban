@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1150 200" width="1150" height="200">
+  <defs>
+    <!-- Clip path for the Kemenkes cross cutouts if needed -->
+    <clipPath id="crossClip">
+      <rect x="0" y="0" width="1150" height="200" />
+    </clipPath>
+  </defs>
+
+  <!-- Clean white background -->
+  <rect width="1150" height="200" fill="#ffffff" />
+
+  <!-- ==================== LEFT: LOGO KEMENKES POLTEKKES BANDUNG ==================== -->
+  <g transform="translate(35, 22)">
+    <!-- 1. Stylized Kemenkes Cross Logo -->
+    <g transform="translate(0, 0)">
+      <!-- Left Petal (Teal) -->
+      <rect x="0" y="48" width="56" height="52" rx="26" fill="#00A99D" />
+      <!-- Top Petal (Teal) -->
+      <rect x="48" y="0" width="52" height="56" rx="26" fill="#00A99D" />
+      <!-- Bottom Petal (Teal) -->
+      <rect x="48" y="92" width="52" height="56" rx="26" fill="#00A99D" />
+      <!-- Right Petal (Bright Lime Green) -->
+      <rect x="92" y="48" width="56" height="52" rx="26" fill="#8DC63F" />
+      
+      <!-- Central overlapping petals / body core -->
+      <circle cx="74" cy="74" r="32" fill="#00A99D" />
+      <!-- Right side of center circle transitioning into green -->
+      <path d="M 74,42 A 32,32 0 0,1 106,74 L 74,74 Z" fill="#8DC63F" />
+      
+      <!-- Iconic White Stylized Cutout (chevron / heart shape forming Kemenkes logo) -->
+      <path d="M 52,60 L 74,82 L 96,60 L 88,48 L 74,62 L 60,48 Z" fill="#ffffff" opacity="0.95" />
+      <path d="M 74,72 L 94,52 L 102,60 L 74,88 L 64,78 L 72,70 Z" fill="#ffffff" />
+      <path d="M 58,74 L 74,90 L 90,74 L 98,82 L 74,106 L 50,82 Z" fill="#ffffff" opacity="0.95" />
+      <circle cx="74" cy="74" r="5" fill="#ffffff" />
+    </g>
+
+    <!-- 2. Text "Kemenkes" & "Poltekkes Bandung" -->
+    <text x="165" y="68" fill="#00A99D" font-family="'Segoe UI', -apple-system, BlinkMacSystemFont, 'Roboto', 'Helvetica Neue', Arial, sans-serif" font-weight="800" font-size="38" letter-spacing="-0.5">Kemenkes</text>
+    <text x="165" y="112" fill="#39B54A" font-family="'Segoe UI', -apple-system, BlinkMacSystemFont, 'Roboto', 'Helvetica Neue', Arial, sans-serif" font-weight="700" font-size="28" letter-spacing="-0.3">Poltekkes Bandung</text>
+  </g>
+
+  <!-- ==================== RIGHT: KEMENTERIAN KESEHATAN KOP DETAILS ==================== -->
+  <g transform="translate(640, 22)">
+    <!-- Line 1: Kementerian Kesehatan -->
+    <text x="0" y="24" fill="#00A99D" font-family="'Segoe UI', -apple-system, BlinkMacSystemFont, 'Roboto', 'Helvetica Neue', Arial, sans-serif" font-weight="800" font-size="23" letter-spacing="-0.2">Kementerian Kesehatan</text>
+
+    <!-- Line 2 & 3: Direktorat Jenderal Sumber Daya Manusia Kesehatan -->
+    <text x="0" y="50" fill="#4A4A4A" font-family="'Segoe UI', -apple-system, BlinkMacSystemFont, 'Roboto', 'Helvetica Neue', Arial, sans-serif" font-weight="700" font-size="19" letter-spacing="-0.2">Direktorat Jenderal</text>
+    <text x="0" y="74" fill="#4A4A4A" font-family="'Segoe UI', -apple-system, BlinkMacSystemFont, 'Roboto', 'Helvetica Neue', Arial, sans-serif" font-weight="700" font-size="19" letter-spacing="-0.2">Sumber Daya Manusia Kesehatan</text>
+
+    <!-- Line 4: Poltekkes Kemenkes Bandung -->
+    <text x="0" y="99" fill="#888888" font-family="'Segoe UI', -apple-system, BlinkMacSystemFont, 'Roboto', 'Helvetica Neue', Arial, sans-serif" font-weight="600" font-size="17" letter-spacing="-0.1">Poltekkes Kemenkes Bandung</text>
+
+    <!-- Address with Pin Icon -->
+    <g transform="translate(0, 114)">
+      <!-- Location Pin Icon -->
+      <path d="M 6,0 C 2.68,0 0,2.68 0,6 C 0,10.5 6,17 6,17 C 6,17 12,10.5 12,6 C 12,2.68 9.32,0 6,0 Z M 6,8.2 C 4.78,8.2 3.8,7.22 3.8,6 C 3.8,4.78 4.78,3.8 6,3.8 C 7.22,3.8 8.2,4.78 8.2,6 C 8.2,7.22 7.22,8.2 6,8.2 Z" fill="#222222" />
+      <text x="18" y="7" fill="#444444" font-family="'Segoe UI', -apple-system, BlinkMacSystemFont, 'Roboto', 'Helvetica Neue', Arial, sans-serif" font-size="12" font-weight="400">Jalan Pajajaran No.56, Pasir Kaliki, Cicendo,</text>
+      <text x="18" y="22" fill="#444444" font-family="'Segoe UI', -apple-system, BlinkMacSystemFont, 'Roboto', 'Helvetica Neue', Arial, sans-serif" font-size="12" font-weight="400">Bandung, Jawa Barat 40171</text>
+    </g>
+
+    <!-- Phone with Phone Icon -->
+    <g transform="translate(0, 149)">
+      <!-- Classic Phone Icon -->
+      <path d="M 1.5,1 C 0.67,1 0,1.67 0,2.5 C 0,8.85 5.15,14 11.5,14 C 12.33,14 13,13.33 13,12.5 L 13,10.2 C 13,9.75 12.7,9.37 12.27,9.27 L 9.8,8.7 C 9.42,8.61 9.02,8.76 8.78,9.07 L 7.8,10.27 C 5.75,9.23 4.27,7.75 3.23,5.7 L 4.43,4.72 C 4.74,4.48 4.89,4.08 4.8,3.7 L 4.23,1.23 C 4.13,0.8 3.75,0.5 3.3,0.5 L 1.5,1 Z" fill="#222222" />
+      <text x="18" y="10" fill="#444444" font-family="'Segoe UI', -apple-system, BlinkMacSystemFont, 'Roboto', 'Helvetica Neue', Arial, sans-serif" font-size="12" font-weight="400">(022) 4231627</text>
+    </g>
+
+    <!-- Website with Globe Icon -->
+    <g transform="translate(0, 169)">
+      <!-- Globe Icon -->
+      <circle cx="6" cy="6" r="6" fill="none" stroke="#222222" stroke-width="1.2" />
+      <ellipse cx="6" cy="6" rx="2.5" ry="6" fill="none" stroke="#222222" stroke-width="1.1" />
+      <line x1="0.5" y1="6" x2="11.5" y2="6" stroke="#222222" stroke-width="1.1" />
+      <line x1="1.8" y1="3" x2="10.2" y2="3" stroke="#222222" stroke-width="0.9" />
+      <line x1="1.8" y1="9" x2="10.2" y2="9" stroke="#222222" stroke-width="0.9" />
+      <text x="18" y="9" fill="#444444" font-family="'Segoe UI', -apple-system, BlinkMacSystemFont, 'Roboto', 'Helvetica Neue', Arial, sans-serif" font-size="12" font-weight="400">https://poltekkesbandung.ac.id</text>
+    </g>
+  </g>
+</svg>

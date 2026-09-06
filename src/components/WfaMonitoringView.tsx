@@ -28,8 +28,8 @@ import {
   Users,
 } from 'lucide-react';
 import { WfaSubmission, WfaValidationStatus } from '../types';
-import { generateWfaPdfReport } from '../utils/wfaPdfReport';
 import { EmployeeManagerView } from './EmployeeManagerView';
+import { WfaPdfExportModal } from './WfaPdfExportModal';
 import { getActiveEmployees, subscribeEmployeeChanges } from '../data/employeeDatabase';
 
 interface WfaMonitoringViewProps {
@@ -51,7 +51,7 @@ export const WfaMonitoringView: React.FC<WfaMonitoringViewProps> = ({
 }) => {
   const [monitorTab, setMonitorTab] = useState<'submissions' | 'employees'>('submissions');
   const [employeeCount, setEmployeeCount] = useState(() => getActiveEmployees().length);
-  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const [isPdfExportModalOpen, setIsPdfExportModalOpen] = useState(false);
 
   useEffect(() => {
     const unsub = subscribeEmployeeChanges(() => {
@@ -116,34 +116,6 @@ export const WfaMonitoringView: React.FC<WfaMonitoringViewProps> = ({
   const pendingCount = submissions.filter((s) => s.status === 'Menunggu Validasi').length;
   const validCount = submissions.filter((s) => s.status === 'Valid').length;
   const rejectedCount = submissions.filter((s) => s.status === 'Ditolak').length;
-
-  // Handle Download PDF Dashboard Report
-  const handleDownloadPdfReport = () => {
-    if (submissions.length === 0) {
-      alert('Belum ada data pengajuan WFA bimbingan untuk diekspor ke PDF.');
-      return;
-    }
-    setIsGeneratingPdf(true);
-    try {
-      const activeLabel =
-        statusFilter === 'All' && lokasiFilter === 'All' && !searchQuery
-          ? 'Semua Data Pengajuan'
-          : `Filter: Status [${statusFilter}], Wilayah [${lokasiFilter}]${
-              searchQuery ? `, Kata Kunci: "${searchQuery}"` : ''
-            }`;
-
-      const targetData = filteredSubmissions.length > 0 ? filteredSubmissions : submissions;
-      generateWfaPdfReport({
-        submissions: targetData,
-        filterLabel: activeLabel,
-      });
-    } catch (err) {
-      console.error('Failed to generate PDF:', err);
-      alert('Terjadi kesalahan saat memproses laporan PDF.');
-    } finally {
-      setIsGeneratingPdf(false);
-    }
-  };
 
   // Handle Quick Validate
   const handleValidate = async (id: string) => {
@@ -316,13 +288,12 @@ export const WfaMonitoringView: React.FC<WfaMonitoringViewProps> = ({
           )}
 
           <button
-            onClick={handleDownloadPdfReport}
-            disabled={isGeneratingPdf}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition-all shadow-xs disabled:opacity-50"
-            title="Download Laporan Resmi Dashboard WFA Bimbingan format PDF"
+            onClick={() => setIsPdfExportModalOpen(true)}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition-all shadow-xs"
+            title="Download Laporan Resmi Dashboard WFA Bimbingan format PDF (Harian, Mingguan, Bulanan, Tahunan)"
           >
             <FileDown className="w-3.5 h-3.5" />
-            <span>{isGeneratingPdf ? 'Membuat PDF...' : 'Download Laporan PDF'}</span>
+            <span>Download Laporan PDF</span>
           </button>
 
           <button
@@ -883,6 +854,15 @@ export const WfaMonitoringView: React.FC<WfaMonitoringViewProps> = ({
           </div>
         </div>
       )}
+
+      {/* PDF Export Time Filter Modal */}
+      <WfaPdfExportModal
+        isOpen={isPdfExportModalOpen}
+        onClose={() => setIsPdfExportModalOpen(false)}
+        submissions={submissions}
+        initialStatusFilter={statusFilter}
+        initialLokasiFilter={lokasiFilter}
+      />
     </div>
   );
 };
