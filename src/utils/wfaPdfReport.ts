@@ -11,11 +11,12 @@ export interface GeneratePdfOptions {
   periodLabel?: string;
   generatedBy?: string;
   customFilename?: string;
+  customKopSuratImage?: string | null;
 }
 
 /**
  * Generate dan Download Laporan Resmi PDF Dashboard Pengajuan WFA Bimbingan
- * Menggunakan Kop Surat Resmi Kemenkes & Poltekkes Bandung yang diunggah pengguna.
+ * Mendukung Kop Surat Bawaan atau Gambar Kop Surat Kustom (PNG/JPG) yang diunggah pengguna.
  */
 export async function generateWfaPdfReport({
   submissions,
@@ -25,6 +26,7 @@ export async function generateWfaPdfReport({
   periodLabel = 'Semua Periode',
   generatedBy = 'Tim Kerja OSDM Poltekkes Kemenkes Bandung',
   customFilename,
+  customKopSuratImage,
 }: GeneratePdfOptions): Promise<void> {
   // A4 Landscape orientation: 297mm x 210mm
   const doc = new jsPDF({
@@ -51,20 +53,46 @@ export async function generateWfaPdfReport({
   const locKarawangKota = submissions.filter((s) => s.lokasiKegiatan === 'Kota Karawang').length;
   const locKarawangKab = submissions.filter((s) => s.lokasiKegiatan === 'Kabupaten Karawang').length;
 
-  // 1. KOP SURAT RESMI KEMENKES POLTEKKES BANDUNG (Gambar Resmi Pengguna)
-  const kopBannerWidth = 260; // Lebar proporsional pada kertas A4 Landscape
-  const kopBannerHeight = 45.2; // Rasio 1150:200
-  const kopBannerX = (pageWidth - kopBannerWidth) / 2;
+  // 1. KOP SURAT RESMI (Bawaan Kemenkes atau Kustom Unggahan Pengguna)
+  let kopBannerWidth = 260; // Lebar standar pada A4 Landscape (260mm dari 269mm area cetak)
+  let kopBannerHeight = 45.2; // Default rasio 1150:200
+  let kopBannerX = (pageWidth - kopBannerWidth) / 2;
   const kopBannerY = 7;
 
   try {
-    const kopSuratDataUrl = await getKopSuratDataUrl();
-    if (kopSuratDataUrl) {
-      doc.addImage(kopSuratDataUrl, 'PNG', kopBannerX, kopBannerY, kopBannerWidth, kopBannerHeight);
+    const rawImage = customKopSuratImage || (await getKopSuratDataUrl());
+    if (rawImage) {
+      // Hitung rasio aspek secara dinamis jika di lingkungan peramban
+      if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
+        const img = new Image();
+        img.src = rawImage;
+        await new Promise<void>((resolve) => {
+          if (img.complete) return resolve();
+          img.onload = () => resolve();
+          img.onerror = () => resolve();
+        });
+        if (img.naturalWidth && img.naturalHeight) {
+          const ratio = img.naturalWidth / img.naturalHeight;
+          const calculatedHeight = kopBannerWidth / ratio;
+          if (calculatedHeight > 48) {
+            kopBannerHeight = 48;
+            kopBannerWidth = Math.min(260, 48 * ratio);
+            kopBannerX = (pageWidth - kopBannerWidth) / 2;
+          } else {
+            kopBannerHeight = Math.max(26, calculatedHeight);
+          }
+        }
+      }
+
+      // Deteksi format gambar
+      const format =
+        rawImage.startsWith('data:image/jpeg') || rawImage.startsWith('data:image/jpg')
+          ? 'JPEG'
+          : 'PNG';
+      doc.addImage(rawImage, format, kopBannerX, kopBannerY, kopBannerWidth, kopBannerHeight);
     }
   } catch (err) {
     console.error('Failed to embed Kop Surat image, falling back to vector lines:', err);
-    // Fallback header text if image fails
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(11);
     doc.setTextColor(0, 169, 157);
@@ -78,8 +106,8 @@ export async function generateWfaPdfReport({
   }
 
   // Garis Kop Ganda Kedinasan (Teal Kemenkes & Slate)
-  const lineY1 = 53.8;
-  const lineY2 = 55.0;
+  const lineY1 = kopBannerY + kopBannerHeight + 1.8;
+  const lineY2 = lineY1 + 1.2;
   doc.setDrawColor(0, 169, 157); // Teal Kemenkes #00A99D
   doc.setLineWidth(0.8);
   doc.line(margin, lineY1, pageWidth - margin, lineY1);
@@ -88,15 +116,19 @@ export async function generateWfaPdfReport({
   doc.line(margin, lineY2, pageWidth - margin, lineY2);
 
   // 2. JUDUL LAPORAN & METADATA
+  const titleY = lineY2 + 6.5;
+  const subtitleY = titleY + 4.5;
+  const dateY = subtitleY + 5.5;
+
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(11);
   doc.setTextColor(15, 23, 42);
-  doc.text(title, pageWidth / 2, 61.5, { align: 'center' });
+  doc.text(title, pageWidth / 2, titleY, { align: 'center' });
 
   doc.setFontSize(8.5);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(100, 116, 139);
-  doc.text(subtitle, pageWidth / 2, 66, { align: 'center' });
+  doc.text(subtitle, pageWidth / 2, subtitleY, { align: 'center' });
 
   // Tanggal cetak & filter
   const todayStr = new Intl.DateTimeFormat('id-ID', {
@@ -106,11 +138,11 @@ export async function generateWfaPdfReport({
 
   doc.setFontSize(8);
   doc.setTextColor(30, 41, 59);
-  doc.text(`Periode: ${periodLabel}   |   Dicetak: ${todayStr} WIB`, margin, 71.5);
-  doc.text(`Kriteria: ${filterLabel}`, pageWidth - margin, 71.5, { align: 'right' });
+  doc.text(`Periode: ${periodLabel}   |   Dicetak: ${todayStr} WIB`, margin, dateY);
+  doc.text(`Kriteria: ${filterLabel}`, pageWidth - margin, dateY, { align: 'right' });
 
   // 3. MINI DASHBOARD KPI CARDS (4 Boxes across page)
-  const cardY = 74.5;
+  const cardY = dateY + 3.0;
   const cardHeight = 15;
   const cardGap = 4;
   const totalWidth = pageWidth - margin * 2;

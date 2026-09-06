@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   FileDown,
@@ -15,6 +15,11 @@ import {
   Sparkles,
   MapPin,
   Building2,
+  Upload,
+  Image as ImageIcon,
+  RotateCcw,
+  Trash2,
+  Check,
 } from 'lucide-react';
 import { WfaSubmission, WfaValidationStatus } from '../types';
 import { generateWfaPdfReport } from '../utils/wfaPdfReport';
@@ -112,6 +117,82 @@ export const WfaPdfExportModal: React.FC<WfaPdfExportModalProps> = ({
 
   // Generating state
   const [isGenerating, setIsGenerating] = useState(false);
+
+  // Custom Kop Surat Upload State (PNG / JPG)
+  const [customKopSurat, setCustomKopSurat] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem('wfa_custom_kop_surat_image');
+    } catch {
+      return null;
+    }
+  });
+  const [customKopSuratName, setCustomKopSuratName] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem('wfa_custom_kop_surat_filename');
+    } catch {
+      return null;
+    }
+  });
+  const [isDraggingKop, setIsDraggingKop] = useState<boolean>(false);
+  const [kopUploadError, setKopUploadError] = useState<string | null>(null);
+  const [uploadSuccessToast, setUploadSuccessToast] = useState<string | null>(null);
+  const kopFileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Process uploaded Kop Surat File (PNG or JPG)
+  const handleProcessKopFile = (file: File) => {
+    setKopUploadError(null);
+    const validTypes = ['image/png', 'image/jpeg', 'image/jpg'];
+    const hasValidExt = /\.(png|jpg|jpeg)$/i.test(file.name);
+    if (!validTypes.includes(file.type) && !hasValidExt) {
+      setKopUploadError('Format file tidak didukung. Harap unggah file gambar berekstensi .PNG, .JPG, atau .JPEG.');
+      return;
+    }
+
+    // Limit to 6MB
+    if (file.size > 6 * 1024 * 1024) {
+      setKopUploadError('Ukuran file terlalu besar (maksimal 6 MB). Silakan gunakan gambar dengan ukuran lebih kecil.');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const result = event.target?.result as string;
+      if (result) {
+        setCustomKopSurat(result);
+        setCustomKopSuratName(file.name);
+        try {
+          localStorage.setItem('wfa_custom_kop_surat_image', result);
+          localStorage.setItem('wfa_custom_kop_surat_filename', file.name);
+        } catch (e) {
+          console.warn('Could not save custom kop surat to localStorage:', e);
+        }
+        setUploadSuccessToast(`Kop surat "${file.name}" berhasil diterapkan.`);
+        setTimeout(() => setUploadSuccessToast(null), 3500);
+      }
+    };
+    reader.onerror = () => {
+      setKopUploadError('Gagal membaca file gambar. Silakan coba kembali.');
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Reset to default official Kop Surat
+  const handleResetKopSurat = () => {
+    setCustomKopSurat(null);
+    setCustomKopSuratName(null);
+    setKopUploadError(null);
+    try {
+      localStorage.removeItem('wfa_custom_kop_surat_image');
+      localStorage.removeItem('wfa_custom_kop_surat_filename');
+    } catch (e) {
+      console.warn('Could not clear custom kop surat from localStorage:', e);
+    }
+    if (kopFileInputRef.current) {
+      kopFileInputRef.current.value = '';
+    }
+    setUploadSuccessToast('Kop surat telah dikembalikan ke format standar Kemenkes.');
+    setTimeout(() => setUploadSuccessToast(null), 3000);
+  };
 
   // Synchronize initial filters when modal opens
   React.useEffect(() => {
@@ -267,6 +348,7 @@ export const WfaPdfExportModal: React.FC<WfaPdfExportModalProps> = ({
         filterLabel: criteriaLabel,
         periodLabel: periodLabel,
         customFilename: `${filenamePrefix}.pdf`,
+        customKopSuratImage: customKopSurat,
       });
 
       // Close modal after download triggers
@@ -616,28 +698,146 @@ export const WfaPdfExportModal: React.FC<WfaPdfExportModalProps> = ({
             )}
           </div>
 
-          {/* KOP SURAT RESMI PREVIEW */}
-          <div className="p-3 bg-slate-50 border border-slate-200 rounded-2xl space-y-2">
-            <div className="flex items-center justify-between text-[11px]">
-              <span className="font-bold text-slate-700 flex items-center gap-1.5">
-                <FileText className="w-3.5 h-3.5 text-emerald-600" />
-                <span>Kop Surat Laporan Resmi:</span>
-              </span>
-              <span className="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 font-semibold text-[10px]">
-                Kemenkes & Poltekkes Bandung
-              </span>
+          {/* 2. KUSTOMISASI GAMBAR KOP SURAT PDF (PNG / JPG) */}
+          <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
+              <label className="text-xs font-bold text-slate-800 flex items-center gap-2">
+                <FileText className="w-3.5 h-3.5 text-indigo-600" />
+                <span>2. Gambar Kop Surat Laporan PDF:</span>
+              </label>
+
+              {customKopSurat ? (
+                <div className="flex items-center gap-1.5 self-start sm:self-auto">
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-100 border border-emerald-300 text-emerald-800 text-[10px] font-semibold">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    Kop Kustom Aktif ({customKopSuratName || 'custom.png'})
+                  </span>
+                </div>
+              ) : (
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-slate-200 border border-slate-300 text-slate-700 text-[10px] font-medium self-start sm:self-auto">
+                  Format Standar: Kemenkes & Poltekkes Bandung
+                </span>
+              )}
             </div>
-            <div className="bg-white rounded-xl border border-slate-200 p-2 overflow-hidden shadow-2xs">
-              <img
-                src="/kop-surat.svg"
-                alt="Kop Surat Resmi Poltekkes Kemenkes Bandung"
-                className="w-full h-auto max-h-20 object-contain mx-auto"
-                referrerPolicy="no-referrer"
-              />
+
+            {/* Pratinjau Tampilan Header Kop Surat */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between text-[11px] text-slate-500">
+                <span className="font-medium flex items-center gap-1">
+                  <ImageIcon className="w-3 h-3 text-slate-400" />
+                  Pratinjau Kop Surat Saat Dicetak di PDF:
+                </span>
+                {customKopSurat && (
+                  <button
+                    type="button"
+                    onClick={handleResetKopSurat}
+                    className="text-[10px] font-semibold text-rose-600 hover:text-rose-700 hover:underline flex items-center gap-1"
+                  >
+                    <RotateCcw className="w-3 h-3" />
+                    Kembalikan ke Kop Bawaan
+                  </button>
+                )}
+              </div>
+
+              <div className="bg-white rounded-xl border border-slate-200 p-2.5 overflow-hidden shadow-2xs">
+                <img
+                  src={customKopSurat || '/kop-surat.svg'}
+                  alt="Kop Surat Laporan Resmi"
+                  className="w-full h-auto max-h-24 object-contain mx-auto"
+                  referrerPolicy="no-referrer"
+                />
+              </div>
             </div>
+
+            {/* Hidden native file input */}
+            <input
+              type="file"
+              ref={kopFileInputRef}
+              accept="image/png, image/jpeg, image/jpg"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) handleProcessKopFile(file);
+              }}
+              className="hidden"
+            />
+
+            {/* Drag and Drop Zone & Upload Buttons */}
+            <div
+              onDragOver={(e) => {
+                e.preventDefault();
+                setIsDraggingKop(true);
+              }}
+              onDragLeave={() => setIsDraggingKop(false)}
+              onDrop={(e) => {
+                e.preventDefault();
+                setIsDraggingKop(false);
+                const file = e.dataTransfer.files?.[0];
+                if (file) handleProcessKopFile(file);
+              }}
+              className={`border-2 border-dashed rounded-xl p-3 sm:p-4 text-center transition-all ${
+                isDraggingKop
+                  ? 'border-indigo-500 bg-indigo-50/80 ring-2 ring-indigo-500/20'
+                  : 'border-slate-300 bg-white hover:border-indigo-400 hover:bg-slate-50/70'
+              }`}
+            >
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-indigo-100 text-indigo-600 flex items-center justify-center shrink-0">
+                  <Upload className="w-4 h-4" />
+                </div>
+                <div className="text-center sm:text-left space-y-0.5">
+                  <p className="text-xs font-bold text-slate-800">
+                    {customKopSurat ? 'Ingin mengganti gambar kop surat?' : 'Sesuaikan Kop Surat dengan Gambar Anda'}
+                  </p>
+                  <p className="text-[10px] text-slate-500">
+                    Klik tombol untuk memilih atau seret & lepas file gambar (PNG / JPG, maks. 6 MB).
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 sm:ml-auto">
+                  <button
+                    type="button"
+                    onClick={() => kopFileInputRef.current?.click()}
+                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-xs hover:shadow transition-all"
+                  >
+                    <Upload className="w-3.5 h-3.5" />
+                    <span>{customKopSurat ? 'Ganti File Gambar' : 'Upload Gambar Kop'}</span>
+                  </button>
+
+                  {customKopSurat && (
+                    <button
+                      type="button"
+                      onClick={handleResetKopSurat}
+                      title="Hapus gambar kustom dan gunakan kop resmi bawaan"
+                      className="p-2 rounded-xl border border-slate-300 text-slate-600 hover:text-rose-600 hover:bg-rose-50 hover:border-rose-300 transition-colors"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Error message */}
+            {kopUploadError && (
+              <div className="p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-[11px] flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                <span>{kopUploadError}</span>
+              </div>
+            )}
+
+            {/* Success toast notification */}
+            {uploadSuccessToast && (
+              <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-[11px] flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>{uploadSuccessToast}</span>
+              </div>
+            )}
+
+            <p className="text-[10px] text-slate-400">
+              💡 Rekomendasi: Gunakan gambar berorientasi horizontal/lanskap (rasio ~5:1 atau 6:1) berlatar belakang putih atau transparan untuk hasil laporan yang simetris dan rapi.
+            </p>
           </div>
 
-          {/* 2. FILTER TAMBAHAN: STATUS & WILAYAH */}
+          {/* 3. FILTER TAMBAHAN: STATUS & WILAYAH */}
           <div className="space-y-2 pt-1">
             <label className="text-xs font-bold text-slate-800 flex items-center gap-2">
               <Filter className="w-3.5 h-3.5 text-slate-500" />
