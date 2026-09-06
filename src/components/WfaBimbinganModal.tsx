@@ -1323,7 +1323,7 @@ export const WfaBimbinganModal: React.FC<WfaBimbinganModalProps> = ({
                           </div>
                           <div className="flex justify-between text-slate-400 pt-0.5">
                             <span>Status OSDM:</span>
-                            <span className="font-bold text-amber-400">Dalam antrean verifikasi pengelola kepegawaian</span>
+                            <span className="font-bold text-amber-400">Dalam antrean verifikasi pengelola OSDM</span>
                           </div>
                         </div>
 
