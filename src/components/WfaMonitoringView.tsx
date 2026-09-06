@@ -23,9 +23,14 @@ import {
   RefreshCw,
   FileSpreadsheet,
   MessageCircle,
-  PhoneCall
+  PhoneCall,
+  FileDown,
+  Users,
 } from 'lucide-react';
 import { WfaSubmission, WfaValidationStatus } from '../types';
+import { generateWfaPdfReport } from '../utils/wfaPdfReport';
+import { EmployeeManagerView } from './EmployeeManagerView';
+import { getActiveEmployees, subscribeEmployeeChanges } from '../data/employeeDatabase';
 
 interface WfaMonitoringViewProps {
   submissions: WfaSubmission[];
@@ -44,9 +49,20 @@ export const WfaMonitoringView: React.FC<WfaMonitoringViewProps> = ({
   osdmContactWa = '08119712525',
   onUpdateOsdmContactWa,
 }) => {
+  const [monitorTab, setMonitorTab] = useState<'submissions' | 'employees'>('submissions');
+  const [employeeCount, setEmployeeCount] = useState(() => getActiveEmployees().length);
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+
+  useEffect(() => {
+    const unsub = subscribeEmployeeChanges(() => {
+      setEmployeeCount(getActiveEmployees().length);
+    });
+    return unsub;
+  }, []);
+
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'All' | WfaValidationStatus>('All');
-  const [lokasiFilter, setLokasiFilter] = useState<'All' | 'Kota Bandung' | 'Kabupaten Bandung'>('All');
+  const [lokasiFilter, setLokasiFilter] = useState<string>('All');
   const [isProcessingId, setIsProcessingId] = useState<string | null>(null);
   const [actionFeedback, setActionFeedback] = useState<{ id: string; message: string; type: 'success' | 'error' } | null>(null);
 
@@ -100,6 +116,34 @@ export const WfaMonitoringView: React.FC<WfaMonitoringViewProps> = ({
   const pendingCount = submissions.filter((s) => s.status === 'Menunggu Validasi').length;
   const validCount = submissions.filter((s) => s.status === 'Valid').length;
   const rejectedCount = submissions.filter((s) => s.status === 'Ditolak').length;
+
+  // Handle Download PDF Dashboard Report
+  const handleDownloadPdfReport = () => {
+    if (submissions.length === 0) {
+      alert('Belum ada data pengajuan WFA bimbingan untuk diekspor ke PDF.');
+      return;
+    }
+    setIsGeneratingPdf(true);
+    try {
+      const activeLabel =
+        statusFilter === 'All' && lokasiFilter === 'All' && !searchQuery
+          ? 'Semua Data Pengajuan'
+          : `Filter: Status [${statusFilter}], Wilayah [${lokasiFilter}]${
+              searchQuery ? `, Kata Kunci: "${searchQuery}"` : ''
+            }`;
+
+      const targetData = filteredSubmissions.length > 0 ? filteredSubmissions : submissions;
+      generateWfaPdfReport({
+        submissions: targetData,
+        filterLabel: activeLabel,
+      });
+    } catch (err) {
+      console.error('Failed to generate PDF:', err);
+      alert('Terjadi kesalahan saat memproses laporan PDF.');
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  };
 
   // Handle Quick Validate
   const handleValidate = async (id: string) => {
@@ -252,33 +296,91 @@ export const WfaMonitoringView: React.FC<WfaMonitoringViewProps> = ({
             <span>Manajemen OSDM Terpadu • Poltekkes Kemenkes Bandung</span>
           </div>
           <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-            Monitoring Pengajuan WFA Bimbingan
+            Monitoring & Administrasi WFA Bimbingan
           </h2>
           <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-            Verifikasi dan validasi data pengajuan Work From Anywhere dosen dan tenaga pendidik secara langsung.
+            Verifikasi pengajuan WFA, unduh laporan PDF resmi, dan kelola database master pegawai.
           </p>
         </div>
 
-        <div className="flex items-center gap-2 w-full sm:w-auto">
+        <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
           {onRefresh && (
             <button
               onClick={onRefresh}
               className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-semibold transition-all shadow-xs"
+              title="Muat Ulang Data"
             >
               <RefreshCw className="w-3.5 h-3.5" />
-              <span>Muat Ulang</span>
+              <span className="hidden sm:inline">Muat Ulang</span>
             </button>
           )}
 
           <button
+            onClick={handleDownloadPdfReport}
+            disabled={isGeneratingPdf}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition-all shadow-xs disabled:opacity-50"
+            title="Download Laporan Resmi Dashboard WFA Bimbingan format PDF"
+          >
+            <FileDown className="w-3.5 h-3.5" />
+            <span>{isGeneratingPdf ? 'Membuat PDF...' : 'Download Laporan PDF'}</span>
+          </button>
+
+          <button
             onClick={handleExportCSV}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-all shadow-xs"
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold transition-all shadow-xs"
+            title="Unduh Rekap CSV"
           >
             <FileSpreadsheet className="w-3.5 h-3.5" />
-            <span>Unduh Rekap CSV</span>
+            <span className="hidden sm:inline">Rekap CSV</span>
           </button>
         </div>
       </div>
+
+      {/* Sub-tab Navigation */}
+      <div className="flex items-center gap-2 p-1.5 rounded-2xl bg-slate-100 border border-slate-200 w-fit max-w-full overflow-x-auto">
+        <button
+          onClick={() => setMonitorTab('submissions')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
+            monitorTab === 'submissions'
+              ? 'bg-white text-slate-900 shadow-xs'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+          }`}
+        >
+          <FileText className="w-4 h-4 text-emerald-600" />
+          <span>Monitoring Pengajuan WFA</span>
+          <span
+            className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
+              monitorTab === 'submissions' ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-700'
+            }`}
+          >
+            {totalCount}
+          </span>
+        </button>
+
+        <button
+          onClick={() => setMonitorTab('employees')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
+            monitorTab === 'employees'
+              ? 'bg-white text-slate-900 shadow-xs'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+          }`}
+        >
+          <Users className="w-4 h-4 text-indigo-600" />
+          <span>Kelola Master Pegawai (Tambah / Edit / Hapus)</span>
+          <span
+            className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
+              monitorTab === 'employees' ? 'bg-indigo-100 text-indigo-800' : 'bg-slate-200 text-slate-700'
+            }`}
+          >
+            {employeeCount}
+          </span>
+        </button>
+      </div>
+
+      {monitorTab === 'employees' ? (
+        <EmployeeManagerView />
+      ) : (
+        <div className="space-y-6">
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
@@ -458,12 +560,16 @@ export const WfaMonitoringView: React.FC<WfaMonitoringViewProps> = ({
           <div>
             <select
               value={lokasiFilter}
-              onChange={(e) => setLokasiFilter(e.target.value as any)}
+              onChange={(e) => setLokasiFilter(e.target.value)}
               className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-800 font-medium focus:outline-none focus:border-indigo-500 cursor-pointer"
             >
               <option value="All">Semua Lokasi Kegiatan</option>
               <option value="Kota Bandung">Kota Bandung</option>
               <option value="Kabupaten Bandung">Kabupaten Bandung</option>
+              <option value="Kota Bogor">Kota Bogor</option>
+              <option value="Kabupaten Bogor">Kabupaten Bogor</option>
+              <option value="Kota Karawang">Kota Karawang</option>
+              <option value="Kabupaten Karawang">Kabupaten Karawang</option>
             </select>
           </div>
         </div>
@@ -690,6 +796,8 @@ export const WfaMonitoringView: React.FC<WfaMonitoringViewProps> = ({
               </motion.div>
             );
           })}
+        </div>
+      )}
         </div>
       )}
 

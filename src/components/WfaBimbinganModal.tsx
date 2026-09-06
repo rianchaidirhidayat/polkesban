@@ -24,7 +24,12 @@ import {
   Info
 } from 'lucide-react';
 import { WfaSubmission, WfaLocation, EmployeeRecord } from '../types';
-import { findEmployeeByNip, searchEmployees } from '../data/employeeDatabase';
+import {
+  findEmployeeByNip,
+  searchEmployees,
+  getLocationsForUnitKerja,
+  subscribeEmployeeChanges,
+} from '../data/employeeDatabase';
 
 interface WfaBimbinganModalProps {
   isOpen: boolean;
@@ -131,6 +136,15 @@ export const WfaBimbinganModal: React.FC<WfaBimbinganModalProps> = ({
     };
   }, [osdmContactWa]);
 
+  // Listen to employee changes from admin monitor or other tabs
+  const [empDbVersion, setEmpDbVersion] = useState(0);
+  useEffect(() => {
+    const unsubscribe = subscribeEmployeeChanges(() => {
+      setEmpDbVersion((v) => v + 1);
+    });
+    return unsubscribe;
+  }, []);
+
   // Auto-detect employee name when NIP is changed
   useEffect(() => {
     if (!nip || nip.trim().length === 0) {
@@ -150,7 +164,25 @@ export const WfaBimbinganModal: React.FC<WfaBimbinganModalProps> = ({
     } else {
       setIsEmployeeFound(false);
     }
-  }, [nip]);
+  }, [nip, empDbVersion]);
+
+  // Dynamic Location Options based on Unit Kerja Pegawai
+  // - Keperawatan Bogor & Kebidanan Bogor: Kota Bogor & Kabupaten Bogor
+  // - Kebidanan Karawang: Kota Karawang & Kabupaten Karawang
+  // - Lainnya: Kota Bandung & Kabupaten Bandung
+  const locationConfig = useMemo(() => {
+    return getLocationsForUnitKerja(unitKerja);
+  }, [unitKerja]);
+
+  // If unit kerja changes and current lokasiKegiatan is not in available options, reset it
+  useEffect(() => {
+    if (lokasiKegiatan && !locationConfig.options.includes(lokasiKegiatan)) {
+      setLokasiKegiatan('');
+      setStatusKota('');
+      setKabDatang(false);
+      setKabPulang(false);
+    }
+  }, [locationConfig, lokasiKegiatan]);
 
   // When location changes, reset choices to prevent mismatched state
   const handleLokasiChange = (loc: WfaLocation | '') => {
@@ -191,12 +223,15 @@ export const WfaBimbinganModal: React.FC<WfaBimbinganModalProps> = ({
     setSubmittedData(null);
   };
 
+  const isKota = lokasiKegiatan.startsWith('Kota');
+  const isKabupaten = lokasiKegiatan.startsWith('Kabupaten');
+
   // Determine computed statusWfa string
   const getComputedStatusWfa = (): string => {
-    if (lokasiKegiatan === 'Kota Bandung') {
+    if (isKota) {
       return statusKota;
     }
-    if (lokasiKegiatan === 'Kabupaten Bandung') {
+    if (isKabupaten) {
       if (kabDatang && kabPulang) {
         return 'WFA Datang & WFA Pulang';
       }
@@ -347,7 +382,7 @@ export const WfaBimbinganModal: React.FC<WfaBimbinganModalProps> = ({
         searched: true,
         found: true,
         submission: matched,
-        statusText: 'Pengajuan WFA Anda pada tanggal tersebut DITOLAK oleh pengelola kepegawaian (OSDM)',
+        statusText: 'Pengajuan WFA Anda pada tanggal tersebut DITOLAK oleh pengelola OSDM',
         isRejectedState: true,
       });
     } else {
@@ -356,7 +391,7 @@ export const WfaBimbinganModal: React.FC<WfaBimbinganModalProps> = ({
         searched: true,
         found: true,
         submission: matched,
-        statusText: 'pengajuan anda masih dalam proses, silahkan hubungi tim kerja OSDM',
+        statusText: 'pengajuan anda masih dalam proses verifikasi validasi',
         isPendingState: true,
       });
     }
@@ -825,17 +860,20 @@ export const WfaBimbinganModal: React.FC<WfaBimbinganModalProps> = ({
                             className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-slate-100 text-xs sm:text-sm font-semibold focus:outline-none focus:border-emerald-500 cursor-pointer"
                           >
                             <option value="">-- Pilih Wilayah Kegiatan --</option>
-                            <option value="Kota Bandung">Kota Bandung</option>
-                            <option value="Kabupaten Bandung">Kabupaten Bandung</option>
+                            {locationConfig.options.map((opt) => (
+                              <option key={opt} value={opt}>
+                                {opt}
+                              </option>
+                            ))}
                           </select>
                           <p className="text-[11px] text-slate-400">
-                            Pilih wilayah Kota Bandung atau Kabupaten Bandung sesuai penugasan.
+                            Wilayah penugasan otomatis disesuaikan untuk unit kerja {unitKerja ? `(${unitKerja})` : 'Anda'}: {locationConfig.options.join(' atau ')}.
                           </p>
                         </div>
                       </div>
 
                       {/* SECTION 2B: PILIHAN STATUS WFA SESUAI ATURAN WILAYAH */}
-                      {lokasiKegiatan === 'Kota Bandung' && (
+                      {isKota && (
                         <motion.div
                           initial={{ opacity: 0, y: -4 }}
                           animate={{ opacity: 1, y: 0 }}
@@ -844,7 +882,7 @@ export const WfaBimbinganModal: React.FC<WfaBimbinganModalProps> = ({
                           <div className="flex items-center justify-between">
                             <label className="text-xs font-bold text-indigo-200 flex items-center gap-2">
                               <span className="w-2.5 h-2.5 rounded-full bg-indigo-400" />
-                              <span>Ketentuan Status Presensi (Khusus Kota Bandung):</span>
+                              <span>Ketentuan Status Presensi (Khusus {lokasiKegiatan}):</span>
                               <span className="text-rose-400">*</span>
                             </label>
                             <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 font-semibold border border-indigo-500/30">
@@ -875,7 +913,7 @@ export const WfaBimbinganModal: React.FC<WfaBimbinganModalProps> = ({
                               <div>
                                 <p className="font-bold text-xs sm:text-sm text-white">WFA Datang</p>
                                 <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
-                                  Presensi datang di lokasi bimbingan lapangan, presensi pulang di kantor direktorat sebelum jam pulang.
+                                  Presensi datang di lokasi bimbingan lapangan, presensi pulang di kantor sebelum jam pulang.
                                 </p>
                               </div>
                             </label>
@@ -902,7 +940,7 @@ export const WfaBimbinganModal: React.FC<WfaBimbinganModalProps> = ({
                               <div>
                                 <p className="font-bold text-xs sm:text-sm text-white">WFA Pulang</p>
                                 <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
-                                  Presensi datang di kantor direktorat, presensi pulang di lokasi bimbingan lapangan.
+                                  Presensi datang di kantor, presensi pulang di lokasi bimbingan lapangan.
                                 </p>
                               </div>
                             </label>
@@ -910,7 +948,7 @@ export const WfaBimbinganModal: React.FC<WfaBimbinganModalProps> = ({
                         </motion.div>
                       )}
 
-                      {lokasiKegiatan === 'Kabupaten Bandung' && (
+                      {isKabupaten && (
                         <motion.div
                           initial={{ opacity: 0, y: -4 }}
                           animate={{ opacity: 1, y: 0 }}
@@ -919,7 +957,7 @@ export const WfaBimbinganModal: React.FC<WfaBimbinganModalProps> = ({
                           <div className="flex items-center justify-between">
                             <label className="text-xs font-bold text-teal-200 flex items-center gap-2">
                               <span className="w-2.5 h-2.5 rounded-full bg-teal-400" />
-                              <span>Ketentuan Status Presensi (Khusus Kabupaten Bandung):</span>
+                              <span>Ketentuan Status Presensi (Khusus {lokasiKegiatan}):</span>
                               <span className="text-rose-400">*</span>
                             </label>
                             <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-teal-500/20 text-teal-300 font-semibold border border-teal-500/30">
@@ -983,7 +1021,7 @@ export const WfaBimbinganModal: React.FC<WfaBimbinganModalProps> = ({
                             <div className="p-3 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-2">
                               <Check className="w-4 h-4 text-emerald-400 shrink-0" />
                               <span>
-                                Terpilih: <strong>WFA Datang & WFA Pulang</strong> (Full Day WFA Kabupaten Bandung).
+                                Terpilih: <strong>WFA Datang & WFA Pulang</strong> (Full Day WFA {lokasiKegiatan}).
                               </span>
                             </div>
                           )}

@@ -121,7 +121,14 @@ export interface AnalyticsSummary {
   todayClicks: number;
 }
 
-export type WfaLocation = 'Kota Bandung' | 'Kabupaten Bandung';
+export type WfaLocation =
+  | 'Kota Bandung'
+  | 'Kabupaten Bandung'
+  | 'Kota Bogor'
+  | 'Kabupaten Bogor'
+  | 'Kota Karawang'
+  | 'Kabupaten Karawang'
+  | string;
 export type WfaValidationStatus = 'Menunggu Validasi' | 'Valid' | 'Ditolak';
 
 export interface WfaSubmission {

@@ -2913,24 +2913,255 @@ export const POLTEKKES_EMPLOYEES: EmployeeRecord[] = [
 ];
 
 /**
+ * Dynamic Storage Layer untuk Tambah, Edit, dan Hapus Data Pegawai
+ */
+export interface EmployeeDelta {
+  added: EmployeeRecord[];
+  updated: Record<string, Partial<EmployeeRecord>>;
+  deleted: string[];
+}
+
+const STORAGE_KEY = 'poltekkes_employees_delta_v1';
+const SYNC_CHANNEL_NAME = 'poltekkes_employee_sync_channel';
+
+// Load delta from localStorage
+export function loadEmployeeDelta(): EmployeeDelta {
+  if (typeof window === 'undefined') {
+    return { added: [], updated: {}, deleted: [] };
+  }
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      return {
+        added: Array.isArray(parsed.added) ? parsed.added : [],
+        updated: parsed.updated && typeof parsed.updated === 'object' ? parsed.updated : {},
+        deleted: Array.isArray(parsed.deleted) ? parsed.deleted : [],
+      };
+    }
+  } catch {}
+  return { added: [], updated: {}, deleted: [] };
+}
+
+// Save delta to localStorage and broadcast
+export function saveEmployeeDelta(delta: EmployeeDelta) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(delta));
+    if (typeof BroadcastChannel !== 'undefined') {
+      const bc = new BroadcastChannel(SYNC_CHANNEL_NAME);
+      bc.postMessage({ type: 'EMPLOYEE_SYNC' });
+      bc.close();
+    }
+  } catch {}
+}
+
+// Get effective combined list of employees
+export function getActiveEmployees(): EmployeeRecord[] {
+  const delta = loadEmployeeDelta();
+  const deletedSet = new Set(delta.deleted.map((n) => n.replace(/[\s.-]/g, '').trim()));
+
+  // 1. Process base employees
+  const baseMap = new Map<string, EmployeeRecord>();
+  for (const emp of POLTEKKES_EMPLOYEES) {
+    const cleanNip = emp.nip.replace(/[\s.-]/g, '').trim();
+    if (!deletedSet.has(cleanNip)) {
+      const override = delta.updated[cleanNip];
+      if (override) {
+        baseMap.set(cleanNip, { ...emp, ...override, nip: cleanNip });
+      } else {
+        baseMap.set(cleanNip, { ...emp, nip: cleanNip });
+      }
+    }
+  }
+
+  // 2. Add new employees
+  const result: EmployeeRecord[] = [];
+  for (const newEmp of delta.added) {
+    const cleanNip = newEmp.nip.replace(/[\s.-]/g, '').trim();
+    if (!deletedSet.has(cleanNip)) {
+      const override = delta.updated[cleanNip];
+      result.push(override ? { ...newEmp, ...override, nip: cleanNip } : { ...newEmp, nip: cleanNip });
+    }
+  }
+
+  // Combine newly added at top, followed by existing
+  result.push(...baseMap.values());
+  return result;
+}
+
+// Add a new employee
+export function addNewEmployee(emp: EmployeeRecord): { success: boolean; error?: string } {
+  const cleanNip = emp.nip.replace(/[\s.-]/g, '').trim();
+  if (!cleanNip) {
+    return { success: false, error: 'Nomor NIP wajib diisi!' };
+  }
+  if (!emp.name.trim()) {
+    return { success: false, error: 'Nama pegawai wajib diisi!' };
+  }
+  if (!emp.unitKerja.trim()) {
+    return { success: false, error: 'Unit kerja wajib dipilih/diisi!' };
+  }
+
+  const existing = findEmployeeByNip(cleanNip);
+  if (existing) {
+    return { success: false, error: `Pegawai dengan NIP ${cleanNip} sudah terdaftar (${existing.name})!` };
+  }
+
+  const delta = loadEmployeeDelta();
+  const nextDeleted = delta.deleted.filter((d) => d.replace(/[\s.-]/g, '').trim() !== cleanNip);
+  const newRecord: EmployeeRecord = {
+    ...emp,
+    nip: cleanNip,
+    name: emp.name.trim(),
+    unitKerja: emp.unitKerja.trim(),
+    jabatan: emp.jabatan.trim() || 'Dosen / Tenaga Kependidikan',
+    email: emp.email?.trim() || '',
+  };
+
+  delta.added = [newRecord, ...delta.added.filter((a) => a.nip.replace(/[\s.-]/g, '').trim() !== cleanNip)];
+  delta.deleted = nextDeleted;
+  saveEmployeeDelta(delta);
+  return { success: true };
+}
+
+// Update an existing employee
+export function updateExistingEmployee(
+  nip: string,
+  data: Partial<EmployeeRecord>
+): { success: boolean; error?: string } {
+  const cleanNip = nip.replace(/[\s.-]/g, '').trim();
+  if (!cleanNip) {
+    return { success: false, error: 'NIP tidak valid!' };
+  }
+
+  const delta = loadEmployeeDelta();
+  const addedIndex = delta.added.findIndex((a) => a.nip.replace(/[\s.-]/g, '').trim() === cleanNip);
+  if (addedIndex >= 0) {
+    delta.added[addedIndex] = { ...delta.added[addedIndex], ...data };
+  } else {
+    delta.updated[cleanNip] = {
+      ...(delta.updated[cleanNip] || {}),
+      ...data,
+    };
+  }
+
+  saveEmployeeDelta(delta);
+  return { success: true };
+}
+
+// Delete an existing employee
+export function deleteExistingEmployee(nip: string): { success: boolean; error?: string } {
+  const cleanNip = nip.replace(/[\s.-]/g, '').trim();
+  if (!cleanNip) {
+    return { success: false, error: 'NIP tidak valid!' };
+  }
+
+  const delta = loadEmployeeDelta();
+  delta.added = delta.added.filter((a) => a.nip.replace(/[\s.-]/g, '').trim() !== cleanNip);
+  if (!delta.deleted.includes(cleanNip)) {
+    delta.deleted.push(cleanNip);
+  }
+  delete delta.updated[cleanNip];
+
+  saveEmployeeDelta(delta);
+  return { success: true };
+}
+
+// Reset employee database to initial factory defaults
+export function resetEmployeeToDefault() {
+  saveEmployeeDelta({ added: [], updated: {}, deleted: [] });
+}
+
+// Subscribe to employee changes across components and browser tabs
+export function subscribeEmployeeChanges(callback: () => void): () => void {
+  const handler = () => callback();
+  window.addEventListener('storage', handler);
+  let bc: BroadcastChannel | null = null;
+  if (typeof BroadcastChannel !== 'undefined') {
+    try {
+      bc = new BroadcastChannel(SYNC_CHANNEL_NAME);
+      bc.onmessage = () => callback();
+    } catch {}
+  }
+  return () => {
+    window.removeEventListener('storage', handler);
+    if (bc) bc.close();
+  };
+}
+
+/**
+ * Logika Lokasi Wilayah Kegiatan berdasarkan Unit Kerja Pegawai
+ * - Keperawatan Bogor & Kebidanan Bogor -> Kota Bogor & Kabupaten Bogor
+ * - Kebidanan Karawang -> Kota Karawang & Kabupaten Karawang
+ * - Lainnya (Bandung, Cimahi, dsb) -> Kota Bandung & Kabupaten Bandung
+ */
+export function getLocationsForUnitKerja(unitKerja?: string): {
+  kota: string;
+  kabupaten: string;
+  options: [string, string];
+} {
+  if (!unitKerja) {
+    return {
+      kota: 'Kota Bandung',
+      kabupaten: 'Kabupaten Bandung',
+      options: ['Kota Bandung', 'Kabupaten Bandung'],
+    };
+  }
+
+  const cleanUnit = unitKerja.toLowerCase().trim();
+
+  // 1. Keperawatan Bogor & Kebidanan Bogor
+  if (cleanUnit.includes('bogor')) {
+    return {
+      kota: 'Kota Bogor',
+      kabupaten: 'Kabupaten Bogor',
+      options: ['Kota Bogor', 'Kabupaten Bogor'],
+    };
+  }
+
+  // 2. Kebidanan Karawang
+  if (cleanUnit.includes('karawang')) {
+    return {
+      kota: 'Kota Karawang',
+      kabupaten: 'Kabupaten Karawang',
+      options: ['Kota Karawang', 'Kabupaten Karawang'],
+    };
+  }
+
+  // 3. Default: Bandung, Cimahi, dsb.
+  return {
+    kota: 'Kota Bandung',
+    kabupaten: 'Kabupaten Bandung',
+    options: ['Kota Bandung', 'Kabupaten Bandung'],
+  };
+}
+
+/**
  * Mencari data pegawai berdasarkan nomor NIP (tepat atau tanpa spasi)
  */
 export function findEmployeeByNip(rawNip: string): EmployeeRecord | undefined {
   if (!rawNip) return undefined;
   const cleanNip = rawNip.replace(/[\s.-]/g, '').trim();
   if (cleanNip.length === 0) return undefined;
-  return POLTEKKES_EMPLOYEES.find(emp => emp.nip === cleanNip);
+  const list = getActiveEmployees();
+  return list.find((emp) => emp.nip === cleanNip);
 }
 
 /**
  * Mencari pegawai berdasarkan NIP atau Nama (untuk autocomplete/pencarian)
  */
 export function searchEmployees(keyword: string): EmployeeRecord[] {
-  if (!keyword || keyword.trim().length === 0) return POLTEKKES_EMPLOYEES.slice(0, 8);
+  const list = getActiveEmployees();
+  if (!keyword || keyword.trim().length === 0) return list.slice(0, 8);
   const q = keyword.toLowerCase().trim();
   const cleanQ = q.replace(/[\s.-]/g, '');
-  return POLTEKKES_EMPLOYEES.filter(emp => {
-    return emp.nip.includes(cleanQ) || emp.name.toLowerCase().includes(q) || emp.unitKerja.toLowerCase().includes(q);
+  return list.filter((emp) => {
+    return (
+      emp.nip.includes(cleanQ) ||
+      emp.name.toLowerCase().includes(q) ||
+      emp.unitKerja.toLowerCase().includes(q) ||
+      emp.jabatan.toLowerCase().includes(q)
+    );
   });
 }
 
