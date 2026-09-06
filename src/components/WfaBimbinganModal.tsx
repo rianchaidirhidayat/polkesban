@@ -1338,7 +1338,7 @@ export const WfaBimbinganModal: React.FC<WfaBimbinganModalProps> = ({
                             className="inline-flex items-center gap-2.5 px-6 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs sm:text-sm transition-all shadow-lg hover:shadow-emerald-500/25 active:scale-[0.98]"
                           >
                             <MessageCircle className="w-4 h-4" />
-                            <span>💬 Hubungi Tim Kerja OSDM (WhatsApp: {rawWaNumber})</span>
+                            <span>Hubungi Tim Kerja OSDM (via WhatsApp)</span>
                           </a>
                         </div>
                       </div>
