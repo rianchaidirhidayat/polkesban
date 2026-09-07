@@ -403,7 +403,7 @@ export const WfaBimbinganModal: React.FC<WfaBimbinganModalProps> = ({
         searched: true,
         found: true,
         submission: matched,
-        statusText: 'pengajuan WFA anda pada tanggal tersebut sudah "VALID dan Sudah terjadwal WFA"',
+        statusText: 'pengajuan WFA anda pada tanggal tersebut sudah "VALID dan Sudah terjadwal WFA di e-Office Mobile"',
         isSuccessState: true,
       });
     } else if (matched.status === 'Ditolak') {
