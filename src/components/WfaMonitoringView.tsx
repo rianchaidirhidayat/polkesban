@@ -802,10 +802,15 @@ export const WfaMonitoringView: React.FC<WfaMonitoringViewProps> = ({
                       </div>
                     </div>
 
-                    {/* Audit Info if Validated */}
-                    {sub.validatedAt && (
+                    {/* Audit Info if Validated or Rejected */}
+                    {sub.validatedAt && sub.status === 'Valid' && (
                       <p className="text-[11px] text-emerald-700 font-medium">
-                        ✓ Disetujui oleh: {sub.validatedBy || 'Pengelola Kepegawaian (OSDM)'} ({new Date(sub.validatedAt).toLocaleString('id-ID')})
+                        ✓ Disetujui oleh: {sub.validatedBy || 'Tim OSDM Poltekkes'} ({new Date(sub.validatedAt).toLocaleString('id-ID')})
+                      </p>
+                    )}
+                    {sub.validatedAt && sub.status === 'Ditolak' && (
+                      <p className="text-[11px] text-rose-700 font-medium">
+                        ✗ Ditolak oleh: {sub.validatedBy || 'Tim OSDM Poltekkes'} ({new Date(sub.validatedAt).toLocaleString('id-ID')})
                       </p>
                     )}
 

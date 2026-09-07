@@ -1454,9 +1454,9 @@ export const WfaBimbinganModal: React.FC<WfaBimbinganModalProps> = ({
                           </p>
                           {checkResult.submission.validatedAt && (
                             <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1">
-                              <span>Waktu Peninjauan:</span>
-                              <span className="font-mono text-slate-300">
-                                {new Date(checkResult.submission.validatedAt).toLocaleString('id-ID')}
+                              <span>Ditolak oleh:</span>
+                              <span className="font-mono text-rose-300">
+                                {checkResult.submission.validatedBy || 'Tim OSDM Poltekkes'} ({new Date(checkResult.submission.validatedAt).toLocaleString('id-ID')})
                               </span>
                             </div>
                           )}
