@@ -32,6 +32,48 @@ import { EmployeeManagerView } from './EmployeeManagerView';
 import { WfaPdfExportModal } from './WfaPdfExportModal';
 import { getActiveEmployees, subscribeEmployeeChanges } from '../data/employeeDatabase';
 
+// Date filter utility helpers
+const toLocalDateStr = (dateInput: string | Date | undefined): string => {
+  if (!dateInput) return '';
+  const d = new Date(dateInput);
+  if (isNaN(d.getTime())) return '';
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const getTodayStr = (): string => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+
+const getYesterdayStr = (): string => {
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+
+const getNDaysAgoStr = (daysAgo: number): string => {
+  const d = new Date();
+  d.setDate(d.getDate() - daysAgo);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+
+const getStartOfMonthStr = (): string => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
+};
+
+const formatDateIndo = (dateStr: string): string => {
+  if (!dateStr) return '';
+  const parts = dateStr.split('-');
+  if (parts.length !== 3) return dateStr;
+  const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+  if (isNaN(d.getTime())) return dateStr;
+  return d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
+};
+
 interface WfaMonitoringViewProps {
   submissions: WfaSubmission[];
   onUpdateStatus: (id: string, status: WfaValidationStatus, notes?: string) => Promise<{ success: boolean; error?: string }>;
@@ -63,6 +105,10 @@ export const WfaMonitoringView: React.FC<WfaMonitoringViewProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'All' | WfaValidationStatus>('All');
   const [lokasiFilter, setLokasiFilter] = useState<string>('All');
+  const [dateTargetMode, setDateTargetMode] = useState<'createdAt' | 'tanggalWfa'>('createdAt');
+  const [datePreset, setDatePreset] = useState<'all' | 'today' | 'yesterday' | 'last7' | 'thisMonth' | 'custom'>('all');
+  const [startDate, setStartDate] = useState<string>('');
+  const [endDate, setEndDate] = useState<string>('');
   const [isProcessingId, setIsProcessingId] = useState<string | null>(null);
   const [actionFeedback, setActionFeedback] = useState<{ id: string; message: string; type: 'success' | 'error' } | null>(null);
 
@@ -201,9 +247,78 @@ export const WfaMonitoringView: React.FC<WfaMonitoringViewProps> = ({
       // Lokasi matches
       const matchLokasi = lokasiFilter === 'All' || sub.lokasiKegiatan === lokasiFilter;
 
-      return matchSearch && matchStatus && matchLokasi;
+      // Date matches
+      let matchDate = true;
+      const targetDate = dateTargetMode === 'createdAt' ? toLocalDateStr(sub.createdAt) : sub.tanggalWfa;
+      if (startDate && endDate) {
+        matchDate = targetDate >= startDate && targetDate <= endDate;
+      } else if (startDate) {
+        matchDate = targetDate >= startDate;
+      } else if (endDate) {
+        matchDate = targetDate <= endDate;
+      }
+
+      return matchSearch && matchStatus && matchLokasi && matchDate;
     });
-  }, [submissions, searchQuery, statusFilter, lokasiFilter]);
+  }, [submissions, searchQuery, statusFilter, lokasiFilter, dateTargetMode, startDate, endDate]);
+
+  // Date preset action handlers
+  const handleApplyDatePreset = (preset: 'all' | 'today' | 'yesterday' | 'last7' | 'thisMonth') => {
+    setDatePreset(preset);
+    if (preset === 'all') {
+      setStartDate('');
+      setEndDate('');
+    } else if (preset === 'today') {
+      const today = getTodayStr();
+      setStartDate(today);
+      setEndDate(today);
+    } else if (preset === 'yesterday') {
+      const yest = getYesterdayStr();
+      setStartDate(yest);
+      setEndDate(yest);
+    } else if (preset === 'last7') {
+      setStartDate(getNDaysAgoStr(6));
+      setEndDate(getTodayStr());
+    } else if (preset === 'thisMonth') {
+      setStartDate(getStartOfMonthStr());
+      setEndDate(getTodayStr());
+    }
+  };
+
+  const handleStartDateChange = (val: string) => {
+    setStartDate(val);
+    setDatePreset('custom');
+  };
+
+  const handleEndDateChange = (val: string) => {
+    setEndDate(val);
+    setDatePreset('custom');
+  };
+
+  const handleClearDateFilter = () => {
+    setStartDate('');
+    setEndDate('');
+    setDatePreset('all');
+  };
+
+  const handleResetAllFilters = () => {
+    setSearchQuery('');
+    setStatusFilter('All');
+    setLokasiFilter('All');
+    setStartDate('');
+    setEndDate('');
+    setDatePreset('all');
+    setDateTargetMode('createdAt');
+  };
+
+  const isAnyFilterActive = Boolean(
+    searchQuery ||
+    statusFilter !== 'All' ||
+    lokasiFilter !== 'All' ||
+    startDate ||
+    endDate ||
+    datePreset !== 'all'
+  );
 
   // KPI Counts
   const totalCount = submissions.length;
@@ -594,66 +709,246 @@ export const WfaMonitoringView: React.FC<WfaMonitoringViewProps> = ({
       )}
 
       {/* Filter and Search Bar */}
-      <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-3">
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div className="p-4 sm:p-5 rounded-2xl bg-white border border-slate-200/90 shadow-xs space-y-3.5">
+        {/* Row 1: Pencarian, Status Validasi, dan Lokasi */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
           {/* Search Box */}
-          <div className="relative">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          <div className="lg:col-span-6 relative">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
               type="text"
-              placeholder="Cari NIP, nama pegawai, atau kegiatan..."
+              placeholder="Cari NIP, nama pegawai, kegiatan, atau unit kerja..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-indigo-500 focus:bg-white transition-all"
+              className="w-full pl-9 pr-9 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-indigo-500 focus:bg-white transition-all shadow-2xs placeholder:text-slate-400"
             />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-200/70 transition-colors"
+                title="Hapus pencarian"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
 
           {/* Status Filter */}
-          <div className="flex items-center gap-2">
-            <Filter className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as any)}
-              className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-800 font-medium focus:outline-none focus:border-indigo-500 cursor-pointer"
-            >
-              <option value="All">Semua Status Validasi ({submissions.length})</option>
-              <option value="Menunggu Validasi">⏳ Menunggu Validasi ({pendingCount})</option>
-              <option value="Valid">✓ Valid & Terjadwal ({validCount})</option>
-              <option value="Ditolak">✕ Ditolak ({rejectedCount})</option>
-            </select>
+          <div className="lg:col-span-3">
+            <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 focus-within:border-indigo-500 focus-within:bg-white transition-all shadow-2xs">
+              <Filter className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value as any)}
+                className="w-full bg-transparent text-xs text-slate-800 font-semibold focus:outline-none cursor-pointer py-0.5"
+              >
+                <option value="All">Semua Status ({submissions.length})</option>
+                <option value="Menunggu Validasi">⏳ Menunggu Validasi ({pendingCount})</option>
+                <option value="Valid">✓ Valid & Terjadwal ({validCount})</option>
+                <option value="Ditolak">✕ Ditolak ({rejectedCount})</option>
+              </select>
+            </div>
           </div>
 
           {/* Lokasi Filter */}
-          <div>
-            <select
-              value={lokasiFilter}
-              onChange={(e) => setLokasiFilter(e.target.value)}
-              className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-800 font-medium focus:outline-none focus:border-indigo-500 cursor-pointer"
-            >
-              <option value="All">Semua Lokasi Kegiatan</option>
-              <option value="Kota Bandung">Kota Bandung</option>
-              <option value="Kabupaten Bandung">Kabupaten Bandung</option>
-              <option value="Kota Bogor">Kota Bogor</option>
-              <option value="Kabupaten Bogor">Kabupaten Bogor</option>
-              <option value="Kota Karawang">Kota Karawang</option>
-              <option value="Kabupaten Karawang">Kabupaten Karawang</option>
-            </select>
+          <div className="lg:col-span-3">
+            <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 focus-within:border-indigo-500 focus-within:bg-white transition-all shadow-2xs">
+              <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+              <select
+                value={lokasiFilter}
+                onChange={(e) => setLokasiFilter(e.target.value)}
+                className="w-full bg-transparent text-xs text-slate-800 font-semibold focus:outline-none cursor-pointer py-0.5"
+              >
+                <option value="All">Semua Lokasi Kegiatan</option>
+                <option value="Kota Bandung">Kota Bandung</option>
+                <option value="Kabupaten Bandung">Kabupaten Bandung</option>
+                <option value="Kota Bogor">Kota Bogor</option>
+                <option value="Kabupaten Bogor">Kabupaten Bogor</option>
+                <option value="Kota Karawang">Kota Karawang</option>
+                <option value="Kabupaten Karawang">Kabupaten Karawang</option>
+              </select>
+            </div>
           </div>
         </div>
 
-        {/* Filter Summary Tags */}
-        <div className="flex items-center justify-between text-xs text-slate-500 pt-1">
-          <span>Menampilkan <strong>{filteredSubmissions.length}</strong> dari {submissions.length} pengajuan</span>
-          {(searchQuery || statusFilter !== 'All' || lokasiFilter !== 'All') && (
+        {/* Row 2: Filter Berdasarkan Tanggal Pengajuan (Tertata Rapi) */}
+        <div className="p-3 sm:p-3.5 rounded-xl bg-gradient-to-r from-slate-50 via-slate-50/80 to-indigo-50/30 border border-slate-200/90 space-y-2.5">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-2.5">
+            {/* Target Pemilihan Tanggal */}
+            <div className="flex items-center gap-2 flex-wrap shrink-0">
+              <div className="p-1.5 rounded-lg bg-indigo-100/80 text-indigo-700 border border-indigo-200 shadow-2xs">
+                <Calendar className="w-3.5 h-3.5" />
+              </div>
+              <span className="text-xs font-bold text-slate-800">
+                Filter Tanggal:
+              </span>
+              <select
+                value={dateTargetMode}
+                onChange={(e) => setDateTargetMode(e.target.value as 'createdAt' | 'tanggalWfa')}
+                className="text-xs font-semibold bg-white border border-slate-300/90 rounded-lg px-2.5 py-1 text-slate-700 focus:outline-none focus:border-indigo-500 cursor-pointer shadow-2xs"
+                title="Pilih apakah filter tanggal mengacu ke tanggal formulir diajukan atau tanggal pelaksanaan WFA"
+              >
+                <option value="createdAt">📅 Tanggal Pengajuan (Diajukan)</option>
+                <option value="tanggalWfa">🗓️ Tanggal Pelaksanaan WFA</option>
+              </select>
+            </div>
+
+            {/* Tombol Pilihan Cepat (Preset) */}
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-[11px] font-semibold text-slate-500 hidden sm:inline mr-1">
+                Pintasan:
+              </span>
+              {[
+                { id: 'all', label: 'Semua' },
+                { id: 'today', label: 'Hari Ini' },
+                { id: 'yesterday', label: 'Kemarin' },
+                { id: 'last7', label: '7 Hari Terakhir' },
+                { id: 'thisMonth', label: 'Bulan Ini' },
+              ].map((p) => {
+                const isActive = datePreset === p.id;
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => handleApplyDatePreset(p.id as any)}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
+                      isActive
+                        ? 'bg-indigo-600 text-white shadow-xs'
+                        : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 hover:border-slate-300'
+                    }`}
+                  >
+                    {p.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Input Rentang Tanggal Pengajuan */}
+          <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-slate-200/70">
+            <span className="text-[11px] text-slate-500 font-semibold">
+              Pilih Tanggal Tertentu / Rentang:
+            </span>
+
+            <div className="flex items-center gap-1.5 bg-white px-2.5 py-1 rounded-lg border border-slate-300/90 shadow-2xs">
+              <span className="text-[11px] text-slate-400 font-medium">Dari:</span>
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => handleStartDateChange(e.target.value)}
+                className="text-xs text-slate-800 font-mono bg-transparent focus:outline-none cursor-pointer"
+              />
+            </div>
+
+            <span className="text-xs text-slate-400 font-semibold">s/d</span>
+
+            <div className="flex items-center gap-1.5 bg-white px-2.5 py-1 rounded-lg border border-slate-300/90 shadow-2xs">
+              <span className="text-[11px] text-slate-400 font-medium">Sampai:</span>
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => handleEndDateChange(e.target.value)}
+                className="text-xs text-slate-800 font-mono bg-transparent focus:outline-none cursor-pointer"
+              />
+            </div>
+
+            {(startDate || endDate) && (
+              <button
+                type="button"
+                onClick={handleClearDateFilter}
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold text-rose-600 hover:text-rose-800 hover:bg-rose-50 border border-rose-200 transition-colors ml-auto sm:ml-0"
+                title="Hapus filter tanggal"
+              >
+                <X className="w-3 h-3" />
+                <span>Hapus Tanggal</span>
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Row 3: Ringkasan Hasil & Active Filter Chips */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pt-1 text-xs">
+          <div className="flex items-center gap-2 flex-wrap text-slate-600">
+            <span>
+              Menampilkan <strong>{filteredSubmissions.length}</strong> dari {submissions.length} pengajuan
+            </span>
+
+            {/* Active filter chips */}
+            {searchQuery && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[11px] border border-slate-200">
+                <span>Cari: &quot;{searchQuery}&quot;</span>
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="hover:text-slate-900 p-0.5 rounded-full"
+                  title="Hapus filter pencarian"
+                >
+                  <X className="w-2.5 h-2.5" />
+                </button>
+              </span>
+            )}
+
+            {statusFilter !== 'All' && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-800 text-[11px] border border-indigo-200 font-medium">
+                <span>Status: {statusFilter}</span>
+                <button
+                  type="button"
+                  onClick={() => setStatusFilter('All')}
+                  className="hover:text-indigo-950 p-0.5 rounded-full"
+                  title="Hapus filter status"
+                >
+                  <X className="w-2.5 h-2.5" />
+                </button>
+              </span>
+            )}
+
+            {lokasiFilter !== 'All' && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-teal-50 text-teal-800 text-[11px] border border-teal-200 font-medium">
+                <span>Lokasi: {lokasiFilter}</span>
+                <button
+                  type="button"
+                  onClick={() => setLokasiFilter('All')}
+                  className="hover:text-teal-950 p-0.5 rounded-full"
+                  title="Hapus filter lokasi"
+                >
+                  <X className="w-2.5 h-2.5" />
+                </button>
+              </span>
+            )}
+
+            {(startDate || endDate) && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 text-[11px] border border-emerald-200 font-medium">
+                <span>
+                  {dateTargetMode === 'createdAt' ? 'Tgl Diajukan' : 'Tgl WFA'}:{' '}
+                  {startDate && endDate && startDate === endDate
+                    ? formatDateIndo(startDate)
+                    : startDate && endDate
+                    ? `${formatDateIndo(startDate)} - ${formatDateIndo(endDate)}`
+                    : startDate
+                    ? `Mulai ${formatDateIndo(startDate)}`
+                    : `Sampai ${formatDateIndo(endDate)}`}
+                </span>
+                <button
+                  type="button"
+                  onClick={handleClearDateFilter}
+                  className="hover:text-emerald-950 p-0.5 rounded-full"
+                  title="Hapus filter tanggal"
+                >
+                  <X className="w-2.5 h-2.5" />
+                </button>
+              </span>
+            )}
+          </div>
+
+          {isAnyFilterActive && (
             <button
-              onClick={() => {
-                setSearchQuery('');
-                setStatusFilter('All');
-                setLokasiFilter('All');
-              }}
-              className="text-indigo-600 hover:text-indigo-800 font-semibold"
+              type="button"
+              onClick={handleResetAllFilters}
+              className="inline-flex items-center gap-1.5 text-xs text-indigo-600 hover:text-indigo-800 font-bold hover:underline shrink-0"
             >
-              Reset Semua Filter
+              <RotateCcw className="w-3 h-3" />
+              <span>Reset Semua Filter</span>
             </button>
           )}
         </div>
@@ -667,10 +962,20 @@ export const WfaMonitoringView: React.FC<WfaMonitoringViewProps> = ({
           </div>
           <h3 className="text-base font-bold text-slate-800">Tidak ada data pengajuan yang cocok</h3>
           <p className="text-xs text-slate-500 max-w-sm mx-auto">
-            {searchQuery || statusFilter !== 'All' || lokasiFilter !== 'All'
-              ? 'Silakan sesuaikan kata kunci pencarian atau filter status Anda.'
+            {isAnyFilterActive
+              ? 'Silakan sesuaikan kata kunci pencarian, filter status, atau filter tanggal pengajuan Anda.'
               : 'Belum ada pegawai yang mengajukan jadwal WFA Bimbingan.'}
           </p>
+          {isAnyFilterActive && (
+            <button
+              type="button"
+              onClick={handleResetAllFilters}
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold transition-all border border-indigo-200 mt-2"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span>Reset Semua Filter</span>
+            </button>
+          )}
         </div>
       ) : (
         <div className="space-y-3">
