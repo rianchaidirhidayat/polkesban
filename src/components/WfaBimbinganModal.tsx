@@ -57,6 +57,7 @@ export const WfaBimbinganModal: React.FC<WfaBimbinganModalProps> = ({
   const [employeeName, setEmployeeName] = useState('');
   const [unitKerja, setUnitKerja] = useState('');
   const [jabatan, setJabatan] = useState('');
+  const [nomorWa, setNomorWa] = useState('');
   const [tanggalWfa, setTanggalWfa] = useState('');
   const [namaKegiatan, setNamaKegiatan] = useState('');
   const [lokasiKegiatan, setLokasiKegiatan] = useState<WfaLocation | ''>('');
@@ -160,11 +161,20 @@ export const WfaBimbinganModal: React.FC<WfaBimbinganModalProps> = ({
       setEmployeeName(matched.name);
       setUnitKerja(matched.unitKerja);
       setJabatan(matched.jabatan);
+      if (matched.nomorWa) {
+        setNomorWa(matched.nomorWa);
+      } else {
+        const cleanNip = nip.replace(/[\s.-]/g, '');
+        const prevSub = allSubmissions.find((s) => s.nip.replace(/[\s.-]/g, '') === cleanNip && s.nomorWa);
+        if (prevSub?.nomorWa) {
+          setNomorWa(prevSub.nomorWa);
+        }
+      }
       setIsEmployeeFound(true);
     } else {
       setIsEmployeeFound(false);
     }
-  }, [nip, empDbVersion]);
+  }, [nip, empDbVersion, allSubmissions]);
 
   // Dynamic Location Options based on Unit Kerja Pegawai
   // - Keperawatan Bogor & Kebidanan Bogor: Kota Bogor & Kabupaten Bogor
@@ -199,6 +209,15 @@ export const WfaBimbinganModal: React.FC<WfaBimbinganModalProps> = ({
     setEmployeeName(emp.name);
     setUnitKerja(emp.unitKerja);
     setJabatan(emp.jabatan);
+    if (emp.nomorWa) {
+      setNomorWa(emp.nomorWa);
+    } else {
+      const cleanNip = emp.nip.replace(/[\s.-]/g, '');
+      const prevSub = allSubmissions.find((s) => s.nip.replace(/[\s.-]/g, '') === cleanNip && s.nomorWa);
+      if (prevSub?.nomorWa) {
+        setNomorWa(prevSub.nomorWa);
+      }
+    }
     setIsEmployeeFound(true);
     setShowNipSuggestions(false);
     setErrorMessage(null);
@@ -210,6 +229,7 @@ export const WfaBimbinganModal: React.FC<WfaBimbinganModalProps> = ({
     setEmployeeName('');
     setUnitKerja('');
     setJabatan('');
+    setNomorWa('');
     setTanggalWfa('');
     setNamaKegiatan('');
     setLokasiKegiatan('');
@@ -251,6 +271,7 @@ export const WfaBimbinganModal: React.FC<WfaBimbinganModalProps> = ({
 
     if (!nip.trim()) missingFields.push('NIP Pegawai');
     if (!employeeName.trim()) missingFields.push('Nama Pegawai');
+    if (!nomorWa.trim()) missingFields.push('Nomor WhatsApp Pegawai');
     if (!tanggalWfa.trim()) missingFields.push('Tanggal WFA');
     if (!namaKegiatan.trim()) missingFields.push('Nama Kegiatan');
     if (!lokasiKegiatan) missingFields.push('Lokasi Kegiatan');
@@ -267,6 +288,13 @@ export const WfaBimbinganModal: React.FC<WfaBimbinganModalProps> = ({
 
     if (missingFields.length > 0) {
       setErrorMessage(`Data tidak boleh kosong! Mohon lengkapi: ${missingFields.join(', ')}.`);
+      return;
+    }
+
+    // Check WhatsApp phone number validity (min 9 digits)
+    const cleanWaDigits = nomorWa.replace(/[^0-9]/g, '');
+    if (cleanWaDigits.length < 9) {
+      setErrorMessage('Nomor WhatsApp tidak valid. Masukkan minimal 9-14 digit nomor WhatsApp aktif (contoh: 081234567890).');
       return;
     }
 
@@ -309,6 +337,7 @@ export const WfaBimbinganModal: React.FC<WfaBimbinganModalProps> = ({
         employeeName: employeeName.trim(),
         unitKerja: unitKerja.trim(),
         jabatan: jabatan.trim(),
+        nomorWa: nomorWa.trim(),
         tanggalWfa: tanggalWfa.trim(),
         namaKegiatan: namaKegiatan.trim(),
         lokasiKegiatan: lokasiKegiatan as WfaLocation,
@@ -603,6 +632,10 @@ export const WfaBimbinganModal: React.FC<WfaBimbinganModalProps> = ({
                           <span className="font-bold text-emerald-300">{submittedData.employeeName}</span>
                         </div>
                         <div className="flex justify-between pb-2 border-b border-slate-800 text-slate-400">
+                          <span>WhatsApp Pegawai:</span>
+                          <span className="font-mono font-semibold text-emerald-300">{submittedData.nomorWa || '-'}</span>
+                        </div>
+                        <div className="flex justify-between pb-2 border-b border-slate-800 text-slate-400">
                           <span>Tanggal Pelaksanaan WFA:</span>
                           <span className="font-semibold text-white">{submittedData.tanggalWfa}</span>
                         </div>
@@ -804,6 +837,40 @@ export const WfaBimbinganModal: React.FC<WfaBimbinganModalProps> = ({
                               )}
                             </div>
                           )}
+                        </div>
+
+                        {/* FIELD 3: NOMOR WHATSAPP PEGAWAI */}
+                        <div className="md:col-span-2 space-y-1.5 pt-3 border-t border-slate-800/80">
+                          <div className="flex items-center justify-between">
+                            <label htmlFor={`${formId}-nomor-wa`} className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                              <MessageCircle className="w-3.5 h-3.5 text-emerald-400" />
+                              <span>Nomor WhatsApp Pegawai (Aktif)</span>
+                              <span className="text-rose-400">*</span>
+                            </label>
+                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-300 font-medium border border-emerald-500/20">
+                              Untuk Komunikasi &amp; Konfirmasi Persyaratan OSDM
+                            </span>
+                          </div>
+                          <div className="relative">
+                            <div className="absolute left-3.5 top-1/2 -translate-y-1/2 flex items-center gap-1.5 text-xs font-mono font-bold text-slate-400 pointer-events-none">
+                              <span className="text-emerald-400 font-bold">WA</span>
+                              <span className="text-slate-600">|</span>
+                            </div>
+                            <input
+                              id={`${formId}-nomor-wa`}
+                              type="tel"
+                              placeholder="Contoh: 081234567890 atau 6281234567890"
+                              value={nomorWa}
+                              onChange={(e) => {
+                                setNomorWa(e.target.value);
+                                setErrorMessage(null);
+                              }}
+                              className="w-full pl-14 pr-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-slate-100 text-xs sm:text-sm font-mono focus:outline-none focus:border-emerald-500 placeholder:text-slate-500 transition-colors"
+                            />
+                          </div>
+                          <p className="text-[11px] text-slate-400">
+                            Nomor WhatsApp aktif digunakan oleh Admin Pengelola OSDM untuk menyampaikan informasi penugasan, kesalahan pengisian, atau kekurangan berkas persyaratan pengajuan WFA Anda secara langsung.
+                          </p>
                         </div>
                       </div>
                     </div>
@@ -1222,7 +1289,7 @@ export const WfaBimbinganModal: React.FC<WfaBimbinganModalProps> = ({
 
                         <div>
                           <span className="inline-flex items-center gap-1 px-3.5 py-1 rounded-full bg-emerald-500 text-slate-950 font-black text-xs uppercase tracking-wider mb-2">
-                            ✓ STATUS RESMI: VALID
+                            ✓ STATUS: VALID
                           </span>
 
                           {/* Required exact phrasing */}
@@ -1241,6 +1308,12 @@ export const WfaBimbinganModal: React.FC<WfaBimbinganModalProps> = ({
                             <span>NIP:</span>
                             <span className="font-mono text-white">{checkResult.submission.nip}</span>
                           </div>
+                          {checkResult.submission.nomorWa && (
+                            <div className="flex justify-between border-b border-slate-800 pb-2 text-slate-400">
+                              <span>WhatsApp Pegawai:</span>
+                              <span className="font-mono text-emerald-300 font-semibold">{checkResult.submission.nomorWa}</span>
+                            </div>
+                          )}
                           <div className="flex justify-between border-b border-slate-800 pb-2 text-slate-400">
                             <span>Tanggal WFA:</span>
                             <span className="font-semibold text-white">{checkResult.submission.tanggalWfa}</span>
@@ -1311,6 +1384,12 @@ export const WfaBimbinganModal: React.FC<WfaBimbinganModalProps> = ({
                             <span>Nama Pegawai:</span>
                             <span className="font-bold text-white">{checkResult.submission.employeeName}</span>
                           </div>
+                          {checkResult.submission.nomorWa && (
+                            <div className="flex justify-between border-b border-slate-800 pb-2 text-slate-400">
+                              <span>WhatsApp Pegawai:</span>
+                              <span className="font-mono text-emerald-300 font-semibold">{checkResult.submission.nomorWa}</span>
+                            </div>
+                          )}
                           <div className="flex justify-between border-b border-slate-800 pb-2 text-slate-400">
                             <span>Tanggal WFA:</span>
                             <span className="font-mono text-white">{checkResult.submission.tanggalWfa}</span>
@@ -1353,14 +1432,14 @@ export const WfaBimbinganModal: React.FC<WfaBimbinganModalProps> = ({
 
                         <div>
                           <span className="inline-flex items-center gap-1.5 px-4 py-1 rounded-full bg-rose-600 text-white font-black text-xs uppercase tracking-wider mb-2 shadow-sm">
-                            ❌ STATUS RESMI: PENGAJUAN DITOLAK
+                            ❌ STATUS: PENGAJUAN DITOLAK
                           </span>
 
                           <h3 className="text-base sm:text-xl font-black text-white leading-snug">
                             Pengajuan WFA Anda pada tanggal tersebut DITOLAK
                           </h3>
                           <p className="text-xs sm:text-sm text-rose-200 mt-1 max-w-lg mx-auto leading-relaxed">
-                            Pengajuan tidak disetujui oleh pengelola kepegawaian (Tim Kerja OSDM Poltekkes Kemenkes Bandung).
+                            Pengajuan tidak disetujui oleh pengelola kepegawaian.
                           </p>
                         </div>
 
@@ -1393,6 +1472,12 @@ export const WfaBimbinganModal: React.FC<WfaBimbinganModalProps> = ({
                             <span>NIP:</span>
                             <span className="font-mono text-white">{checkResult.submission.nip}</span>
                           </div>
+                          {checkResult.submission.nomorWa && (
+                            <div className="flex justify-between border-b border-slate-800 pb-2 text-slate-400">
+                              <span>WhatsApp Pegawai:</span>
+                              <span className="font-mono text-emerald-300 font-semibold">{checkResult.submission.nomorWa}</span>
+                            </div>
+                          )}
                           <div className="flex justify-between border-b border-slate-800 pb-2 text-slate-400">
                             <span>Tanggal Pengajuan WFA:</span>
                             <span className="font-semibold text-rose-300">{checkResult.submission.tanggalWfa}</span>

@@ -3016,6 +3016,7 @@ export function addNewEmployee(emp: EmployeeRecord): { success: boolean; error?:
     unitKerja: emp.unitKerja.trim(),
     jabatan: emp.jabatan.trim() || 'Dosen / Tenaga Kependidikan',
     email: emp.email?.trim() || '',
+    nomorWa: emp.nomorWa?.trim() || '',
   };
 
   delta.added = [newRecord, ...delta.added.filter((a) => a.nip.replace(/[\s.-]/g, '').trim() !== cleanNip)];
@@ -3175,6 +3176,7 @@ export const INITIAL_WFA_SUBMISSIONS: WfaSubmission[] = [
     employeeName: 'Dr. H. Ahmad Sudrajat, S.Kp., M.Kes.',
     unitKerja: 'Jurusan Keperawatan Bandung',
     jabatan: 'Dosen Lektor Kepala / Pembimbing Klinik',
+    nomorWa: '08122334455',
     tanggalWfa: '2026-09-08',
     namaKegiatan: 'Bimbingan Praktik Klinik Keperawatan Medikal Bedah Mahasiswa Tingkat III di RSUP Dr. Hasan Sadikin',
     lokasiKegiatan: 'Kota Bandung',
@@ -3193,6 +3195,7 @@ export const INITIAL_WFA_SUBMISSIONS: WfaSubmission[] = [
     employeeName: 'Hj. Dewi Sartika, S.ST., M.Keb.',
     unitKerja: 'Jurusan Kebidanan Bandung',
     jabatan: 'Dosen Lektor / Koordinator Praktik Kebidanan',
+    nomorWa: '081398765432',
     tanggalWfa: '2026-09-10',
     namaKegiatan: 'Supervisi & Ujian Asuhan Persalinan Normal (APN) Mahasiswa D3 Kebidanan di RSUD Al-Ihsan',
     lokasiKegiatan: 'Kabupaten Bandung',
@@ -3208,6 +3211,7 @@ export const INITIAL_WFA_SUBMISSIONS: WfaSubmission[] = [
     employeeName: 'Drs. Ridwan Kurniawan, Apt., M.Si.',
     unitKerja: 'Jurusan Farmasi',
     jabatan: 'Dosen Lektor / Pembimbing PKL Farmasi',
+    nomorWa: '085721098765',
     tanggalWfa: '2026-09-11',
     namaKegiatan: 'Bimbingan dan Evaluasi Mahasiswa PKL Industri Farmasi di Bio Farma',
     lokasiKegiatan: 'Kota Bandung',

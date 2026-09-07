@@ -89,6 +89,100 @@ export const WfaMonitoringView: React.FC<WfaMonitoringViewProps> = ({
   // Delete confirmation
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
+  // WhatsApp modal state for sending messages to employee
+  const [waModalItem, setWaModalItem] = useState<WfaSubmission | null>(null);
+  const [waTargetPhone, setWaTargetPhone] = useState('');
+  const [waCustomMessage, setWaCustomMessage] = useState('');
+  const [waPresetType, setWaPresetType] = useState<'kekurangan' | 'kesalahan' | 'konfirmasi' | 'validasi' | 'custom'>('kekurangan');
+  const [waPhoneError, setWaPhoneError] = useState<string | null>(null);
+
+  // Format WhatsApp phone number (08... -> 628...)
+  const formatWaPhone = (phone: string): string => {
+    let clean = phone.replace(/[^0-9]/g, '');
+    if (clean.startsWith('0')) {
+      clean = '62' + clean.substring(1);
+    } else if (clean.startsWith('8')) {
+      clean = '62' + clean;
+    }
+    return clean;
+  };
+
+  // Generate template message for admin
+  const getWaTemplate = (
+    type: 'kekurangan' | 'kesalahan' | 'konfirmasi' | 'validasi' | 'custom',
+    sub: WfaSubmission,
+    extraNotes?: string
+  ): string => {
+    const nama = sub.employeeName || 'Bapak/Ibu';
+    const tanggal = sub.tanggalWfa;
+    const kegiatan = sub.namaKegiatan;
+    const lokasi = `${sub.lokasiKegiatan}${sub.lokasiLahanBimbingan ? ' (' + sub.lokasiLahanBimbingan + ')' : ''}`;
+
+    switch (type) {
+      case 'kekurangan':
+        return `Yth. ${nama},\n\nSehubungan dengan pengajuan WFA Bimbingan Anda untuk tanggal ${tanggal} di ${lokasi} (Kegiatan: ${kegiatan}), Tim Kerja OSDM Poltekkes Kemenkes Bandung mendapati adanya kekurangan berkas / persyaratan:\n\n- ${extraNotes || '[Tuliskan rincian berkas atau kekurangan persyaratan di sini, misal: lembar pengesahan surat tugas belum bertanda tangan / tautan belum bisa dibuka]'}\n\nMohon segera melengkapi kekurangan persyaratan tersebut agar pengajuan jadwal WFA Anda dapat kami validasi.\n\nTerima kasih.\nTim Kerja OSDM Poltekkes Kemenkes Bandung`;
+
+      case 'kesalahan':
+        return `Yth. ${nama},\n\nMohon maaf, pengajuan WFA Bimbingan Anda untuk tanggal ${tanggal} di ${lokasi} belum dapat disetujui karena terdapat kesalahan data / tidak sesuai ketentuan:\n\n- ${extraNotes || sub.catatanPengelola || '[Tuliskan kesalahan atau alasan revisi di sini]'}\n\nSilakan lakukan perbaikan atau pengajuan ulang melalui aplikasi WFA Bimbingan. Terima kasih.\nTim Kerja OSDM Poltekkes Kemenkes Bandung`;
+
+      case 'konfirmasi':
+        return `Yth. ${nama},\n\nTim Kerja OSDM Poltekkes Kemenkes Bandung ingin mengonfirmasi terkait pengajuan WFA Bimbingan Anda untuk tanggal ${tanggal} di ${lokasi} (Kegiatan: ${kegiatan}).\n\nMohon konfirmasinya terkait kesesuaian berkas surat tugas dan jadwal kehadiran bimbingan Anda.\n\nTerima kasih.\nTim Kerja OSDM Poltekkes Kemenkes Bandung`;
+
+      case 'validasi':
+        return `Yth. ${nama},\n\nPengajuan WFA Bimbingan Anda untuk tanggal ${tanggal} di ${lokasi} (Kegiatan: ${kegiatan}, Status: ${sub.statusWfa}) telah divalidasi dan DINYATAKAN VALID / DISETUJUI oleh Tim Kerja OSDM Poltekkes Kemenkes Bandung.\n\nData telah tercatat di sistem jadwal WFA. Selamat bertugas.\n\nTerima kasih.\nTim Kerja OSDM Poltekkes Kemenkes Bandung`;
+
+      default:
+        return extraNotes || '';
+    }
+  };
+
+  // Open WhatsApp Messenger Modal
+  const handleOpenWaModal = (
+    sub: WfaSubmission,
+    defaultPreset?: 'kekurangan' | 'kesalahan' | 'konfirmasi' | 'validasi',
+    extraNotes?: string
+  ) => {
+    let preset = defaultPreset;
+    if (!preset) {
+      if (sub.status === 'Ditolak') preset = 'kesalahan';
+      else if (sub.status === 'Valid') preset = 'validasi';
+      else preset = 'kekurangan';
+    }
+
+    setWaModalItem(sub);
+    setWaTargetPhone(sub.nomorWa || '');
+    setWaPresetType(preset);
+    setWaPhoneError(null);
+    setWaCustomMessage(getWaTemplate(preset, sub, extraNotes));
+  };
+
+  // Change active preset inside WA modal
+  const handleChangeWaPreset = (preset: 'kekurangan' | 'kesalahan' | 'konfirmasi' | 'validasi') => {
+    if (!waModalItem) return;
+    setWaPresetType(preset);
+    setWaCustomMessage(getWaTemplate(preset, waModalItem));
+  };
+
+  // Open WhatsApp Web/App
+  const handleSendWa = () => {
+    if (!waModalItem) return;
+    const cleanPhone = formatWaPhone(waTargetPhone);
+    if (cleanPhone.length < 9) {
+      setWaPhoneError('Nomor WhatsApp tidak valid. Masukkan minimal 9-14 digit angka.');
+      return;
+    }
+
+    const url = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(waCustomMessage)}`;
+    window.open(url, '_blank');
+    setActionFeedback({
+      id: waModalItem.id,
+      message: `Tautan WhatsApp ke ${waModalItem.employeeName} (${cleanPhone}) berhasil dibuka!`,
+      type: 'success',
+    });
+    setWaModalItem(null);
+    setTimeout(() => setActionFeedback(null), 3500);
+  };
+
   // Filtered submissions
   const filteredSubmissions = useMemo(() => {
     return submissions.filter((sub) => {
@@ -213,6 +307,7 @@ export const WfaMonitoringView: React.FC<WfaMonitoringViewProps> = ({
       'ID Pengajuan',
       'NIP',
       'Nama Pegawai',
+      'Nomor WhatsApp Pegawai',
       'Unit Kerja',
       'Jabatan',
       'Tanggal WFA',
@@ -232,6 +327,7 @@ export const WfaMonitoringView: React.FC<WfaMonitoringViewProps> = ({
       `"${sub.id}"`,
       `"${sub.nip}"`,
       `"${sub.employeeName.replace(/"/g, '""')}"`,
+      `"${(sub.nomorWa || '-').replace(/"/g, '""')}"`,
       `"${(sub.unitKerja || '').replace(/"/g, '""')}"`,
       `"${(sub.jabatan || '').replace(/"/g, '""')}"`,
       `"${sub.tanggalWfa}"`,
@@ -630,13 +726,28 @@ export const WfaMonitoringView: React.FC<WfaMonitoringViewProps> = ({
                     </div>
 
                     {/* Employee Profile */}
-                    <div className="flex flex-col sm:flex-row sm:items-baseline gap-1 sm:gap-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-3 flex-wrap">
                       <h4 className="text-base font-bold text-slate-900 tracking-tight">
                         {sub.employeeName}
                       </h4>
                       <span className="font-mono text-xs font-semibold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100">
                         NIP: {sub.nip}
                       </span>
+                      {sub.nomorWa ? (
+                        <button
+                          type="button"
+                          onClick={() => handleOpenWaModal(sub)}
+                          className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-mono font-bold text-xs border border-emerald-200 transition-colors shadow-2xs"
+                          title="Klik untuk mengirim pesan WhatsApp ke nomor ini"
+                        >
+                          <MessageCircle className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>WA: {sub.nomorWa}</span>
+                        </button>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 text-slate-400 font-medium text-[11px] border border-slate-200">
+                          <span>WA: Belum dicantumkan</span>
+                        </span>
+                      )}
                     </div>
 
                     {/* Unit & Jabatan */}
@@ -708,7 +819,17 @@ export const WfaMonitoringView: React.FC<WfaMonitoringViewProps> = ({
                   </div>
 
                   {/* Right Block: Actions */}
-                  <div className="flex items-center gap-2 shrink-0 self-end lg:self-center">
+                  <div className="flex items-center gap-2 shrink-0 self-end lg:self-center flex-wrap justify-end">
+                    {/* BUTTON WA: KIRIM WHATSAPP KE PEGAWAI */}
+                    <button
+                      onClick={() => handleOpenWaModal(sub)}
+                      className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-xs active:scale-95"
+                      title="Kirim pesan WhatsApp ke pegawai untuk menyampaikan informasi, kesalahan atau kekurangan persyaratan"
+                    >
+                      <MessageCircle className="w-4 h-4" />
+                      <span>Kirim WA</span>
+                    </button>
+
                     {/* BUTTON 1: TOMBOL VALIDASI (Utama) */}
                     {sub.status !== 'Valid' ? (
                       <button
@@ -806,7 +927,7 @@ export const WfaMonitoringView: React.FC<WfaMonitoringViewProps> = ({
               />
             </div>
 
-            <div className="flex items-center justify-end gap-2 pt-2">
+            <div className="flex items-center justify-end gap-2 pt-2 flex-wrap">
               <button
                 onClick={() => setRejectModalItem(null)}
                 className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold"
@@ -815,10 +936,226 @@ export const WfaMonitoringView: React.FC<WfaMonitoringViewProps> = ({
               </button>
               <button
                 onClick={handleConfirmReject}
-                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-xs"
+                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold shadow-xs"
               >
-                Tandai Ditolak
+                Tandai Ditolak Saja
               </button>
+              <button
+                onClick={async () => {
+                  const targetItem = rejectModalItem;
+                  const reason = rejectReason;
+                  await handleConfirmReject();
+                  handleOpenWaModal(targetItem, 'kesalahan', reason);
+                }}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-xs"
+              >
+                <MessageCircle className="w-3.5 h-3.5" />
+                <span>Tolak &amp; Kirim WA Pegawai</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: KIRIM PESAN WHATSAPP KE PEGAWAI */}
+      {waModalItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs overflow-y-auto">
+          <div className="w-full max-w-xl bg-white rounded-3xl shadow-2xl border border-slate-200 text-slate-900 overflow-hidden my-6">
+            {/* Modal Header with WhatsApp theme */}
+            <div className="bg-emerald-700 text-white p-5 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center text-white">
+                  <MessageCircle className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black">
+                    Kirim Pesan WhatsApp ke Pegawai
+                  </h3>
+                  <p className="text-xs text-emerald-100">
+                    Sampaikan informasi, kesalahan data, atau kekurangan persyaratan pengajuan
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setWaModalItem(null)}
+                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center text-sm font-bold transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-5 sm:p-6 space-y-4 max-h-[80vh] overflow-y-auto">
+              {/* Pegawai Info Box */}
+              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 text-xs space-y-1.5">
+                <div className="flex justify-between items-baseline flex-wrap gap-1">
+                  <span className="text-slate-500 font-medium">Nama Pegawai:</span>
+                  <span className="font-bold text-slate-900 text-sm">{waModalItem.employeeName}</span>
+                </div>
+                <div className="flex justify-between items-baseline flex-wrap gap-1">
+                  <span className="text-slate-500 font-medium">NIP Pegawai:</span>
+                  <span className="font-mono text-slate-800 font-semibold">{waModalItem.nip}</span>
+                </div>
+                <div className="flex justify-between items-baseline flex-wrap gap-1">
+                  <span className="text-slate-500 font-medium">Tanggal Pelaksanaan WFA:</span>
+                  <span className="font-semibold text-slate-800">{waModalItem.tanggalWfa}</span>
+                </div>
+                <div className="flex justify-between items-baseline flex-wrap gap-1">
+                  <span className="text-slate-500 font-medium">Lokasi / Lahan:</span>
+                  <span className="text-slate-700 font-medium">{waModalItem.lokasiKegiatan} ({waModalItem.lokasiLahanBimbingan || '-'})</span>
+                </div>
+                <div className="flex justify-between items-center pt-1 border-t border-slate-200">
+                  <span className="text-slate-500 font-medium">Status Pengajuan Saat Ini:</span>
+                  <span className={`px-2 py-0.5 rounded-full font-bold text-[11px] ${
+                    waModalItem.status === 'Valid'
+                      ? 'bg-emerald-100 text-emerald-800'
+                      : waModalItem.status === 'Menunggu Validasi'
+                      ? 'bg-amber-100 text-amber-800'
+                      : 'bg-rose-100 text-rose-800'
+                  }`}>
+                    {waModalItem.status}
+                  </span>
+                </div>
+              </div>
+
+              {/* Nomor WhatsApp Input Field */}
+              <div className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                    <span>Nomor WhatsApp Tujuan Pegawai</span>
+                    <span className="text-rose-500">*</span>
+                  </label>
+                  {waTargetPhone && (
+                    <span className="text-[11px] font-mono text-emerald-600 font-semibold">
+                      Tujuan: +{formatWaPhone(waTargetPhone)}
+                    </span>
+                  )}
+                </div>
+                <div className="relative">
+                  <div className="absolute left-3.5 top-1/2 -translate-y-1/2 flex items-center gap-1 text-xs font-mono font-bold text-slate-400 pointer-events-none">
+                    <span className="text-emerald-600">WA</span>
+                    <span className="text-slate-300">|</span>
+                  </div>
+                  <input
+                    type="tel"
+                    placeholder="Contoh: 081234567890 atau 6281234567890"
+                    value={waTargetPhone}
+                    onChange={(e) => {
+                      setWaTargetPhone(e.target.value);
+                      setWaPhoneError(null);
+                    }}
+                    className={`w-full pl-14 pr-3.5 py-2.5 rounded-xl border text-xs sm:text-sm font-mono text-slate-900 focus:outline-none focus:border-emerald-500 ${
+                      waPhoneError ? 'border-rose-400 bg-rose-50/40' : 'border-slate-300 bg-white'
+                    }`}
+                  />
+                </div>
+                {waPhoneError ? (
+                  <p className="text-[11px] text-rose-600 font-medium">{waPhoneError}</p>
+                ) : (
+                  <p className="text-[11px] text-slate-400">
+                    Nomor WhatsApp diambil otomatis dari formulir pengajuan pegawai atau dapat Anda sesuaikan.
+                  </p>
+                )}
+              </div>
+
+              {/* Quick Template Selector Chips */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-800 block">
+                  Pilih Format Pesan Cepat:
+                </label>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleChangeWaPreset('kekurangan')}
+                    className={`p-2 rounded-xl text-left text-xs font-bold transition-all border ${
+                      waPresetType === 'kekurangan'
+                        ? 'bg-amber-500 text-white border-amber-600 shadow-xs'
+                        : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
+                    }`}
+                  >
+                    ⚠️ Kekurangan Berkas
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleChangeWaPreset('kesalahan')}
+                    className={`p-2 rounded-xl text-left text-xs font-bold transition-all border ${
+                      waPresetType === 'kesalahan'
+                        ? 'bg-rose-600 text-white border-rose-700 shadow-xs'
+                        : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
+                    }`}
+                  >
+                    ❌ Kesalahan / Revisi
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleChangeWaPreset('konfirmasi')}
+                    className={`p-2 rounded-xl text-left text-xs font-bold transition-all border ${
+                      waPresetType === 'konfirmasi'
+                        ? 'bg-sky-600 text-white border-sky-700 shadow-xs'
+                        : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
+                    }`}
+                  >
+                    ℹ️ Konfirmasi Jadwal
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleChangeWaPreset('validasi')}
+                    className={`p-2 rounded-xl text-left text-xs font-bold transition-all border ${
+                      waPresetType === 'validasi'
+                        ? 'bg-emerald-600 text-white border-emerald-700 shadow-xs'
+                        : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
+                    }`}
+                  >
+                    ✅ WFA Disetujui
+                  </button>
+                </div>
+              </div>
+
+              {/* Textarea for WhatsApp message content */}
+              <div className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-slate-800">
+                    Isi Pesan WhatsApp (Dapat Diedit Bebas):
+                  </label>
+                  <span className="text-[11px] text-slate-400">
+                    {waCustomMessage.length} karakter
+                  </span>
+                </div>
+                <textarea
+                  rows={6}
+                  value={waCustomMessage}
+                  onChange={(e) => {
+                    setWaCustomMessage(e.target.value);
+                    setWaPresetType('custom');
+                  }}
+                  placeholder="Ketik isi pesan WhatsApp untuk pegawai..."
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm text-slate-900 leading-relaxed focus:outline-none focus:border-emerald-500 font-sans"
+                />
+                <p className="text-[11px] text-slate-500 italic">
+                  💡 Tips: Anda dapat mengubah atau menambahkan rincian berkas yang kurang langsung pada kotak pesan di atas sebelum menekan tombol kirim.
+                </p>
+              </div>
+
+              {/* Modal Actions */}
+              <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setWaModalItem(null)}
+                  className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition-colors"
+                >
+                  Batal
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSendWa}
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-md hover:shadow-emerald-600/30 transition-all active:scale-95"
+                >
+                  <MessageCircle className="w-4 h-4" />
+                  <span>Buka WhatsApp &amp; Kirim Pesan</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>

@@ -373,6 +373,7 @@ export function subscribeToWfaSubmissions(
               employeeName: d.employeeName || '',
               unitKerja: d.unitKerja || '',
               jabatan: d.jabatan || '',
+              nomorWa: d.nomorWa || '',
               tanggalWfa: String(d.tanggalWfa).trim(),
               namaKegiatan: d.namaKegiatan || '',
               lokasiKegiatan: d.lokasiKegiatan || 'Kota Bandung',

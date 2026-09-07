@@ -137,6 +137,7 @@ export interface WfaSubmission {
   employeeName: string;
   unitKerja?: string;
   jabatan?: string;
+  nomorWa?: string;
   tanggalWfa: string; // YYYY-MM-DD
   namaKegiatan: string;
   lokasiKegiatan: WfaLocation;
@@ -156,4 +157,5 @@ export interface EmployeeRecord {
   unitKerja: string;
   jabatan: string;
   email?: string;
+  nomorWa?: string;
 }
