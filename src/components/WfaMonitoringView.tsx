@@ -33,16 +33,6 @@ import { WfaPdfExportModal } from './WfaPdfExportModal';
 import { getActiveEmployees, subscribeEmployeeChanges } from '../data/employeeDatabase';
 
 // Date filter utility helpers
-const toLocalDateStr = (dateInput: string | Date | undefined): string => {
-  if (!dateInput) return '';
-  const d = new Date(dateInput);
-  if (isNaN(d.getTime())) return '';
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-};
-
 const formatDateIndo = (dateStr: string): string => {
   if (!dateStr) return '';
   const parts = dateStr.split('-');
@@ -222,11 +212,10 @@ export const WfaMonitoringView: React.FC<WfaMonitoringViewProps> = ({
       // Lokasi matches
       const matchLokasi = lokasiFilter === 'All' || sub.lokasiKegiatan === lokasiFilter;
 
-      // Date matches (per hari berdasarkan tanggal pengajuan)
+      // Date matches (per hari berdasarkan tanggal pelaksanaan WFA)
       let matchDate = true;
       if (filterDate) {
-        const subCreatedDate = toLocalDateStr(sub.createdAt) || sub.tanggalWfa;
-        matchDate = subCreatedDate === filterDate;
+        matchDate = sub.tanggalWfa === filterDate;
       }
 
       return matchSearch && matchStatus && matchLokasi && matchDate;
@@ -660,24 +649,24 @@ export const WfaMonitoringView: React.FC<WfaMonitoringViewProps> = ({
             )}
           </div>
 
-          {/* Filter Tanggal Pengajuan (Per Hari) */}
+          {/* Filter Tanggal Pelaksanaan WFA (Per Hari) */}
           <div className="lg:col-span-3">
             <div className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 focus-within:border-indigo-500 focus-within:bg-white transition-all">
               <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-              <span className="text-[11px] font-semibold text-slate-500 shrink-0">Tgl Diajukan:</span>
+              <span className="text-[11px] font-semibold text-slate-500 shrink-0">Tgl WFA:</span>
               <input
                 type="date"
                 value={filterDate}
                 onChange={(e) => setFilterDate(e.target.value)}
                 className="w-full bg-transparent text-xs text-slate-800 font-semibold focus:outline-none cursor-pointer py-0 min-w-0"
-                title="Filter pengajuan berdasarkan tanggal diajukan per hari"
+                title="Filter pengajuan berdasarkan tanggal pelaksanaan WFA per hari"
               />
               {filterDate && (
                 <button
                   type="button"
                   onClick={() => setFilterDate('')}
                   className="text-slate-400 hover:text-slate-600 p-0.5 rounded hover:bg-slate-200/70 transition-colors shrink-0"
-                  title="Hapus filter tanggal"
+                  title="Hapus filter tanggal WFA"
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>
@@ -729,12 +718,12 @@ export const WfaMonitoringView: React.FC<WfaMonitoringViewProps> = ({
             {filterDate && (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 text-[11px] font-semibold border border-indigo-200">
                 <Calendar className="w-3 h-3" />
-                <span>Diajukan: {formatDateIndo(filterDate)}</span>
+                <span>Tgl WFA: {formatDateIndo(filterDate)}</span>
                 <button
                   type="button"
                   onClick={() => setFilterDate('')}
                   className="hover:text-indigo-900 p-0.5 rounded-full"
-                  title="Hapus filter tanggal"
+                  title="Hapus filter tanggal WFA"
                 >
                   <X className="w-2.5 h-2.5" />
                 </button>
@@ -762,7 +751,7 @@ export const WfaMonitoringView: React.FC<WfaMonitoringViewProps> = ({
           <h3 className="text-base font-bold text-slate-800">Tidak ada data pengajuan yang cocok</h3>
           <p className="text-xs text-slate-500 max-w-sm mx-auto">
             {isAnyFilterActive
-              ? 'Silakan sesuaikan kata kunci pencarian, filter status, atau filter tanggal pengajuan Anda.'
+              ? 'Silakan sesuaikan kata kunci pencarian, filter status, atau filter tanggal WFA Anda.'
               : 'Belum ada pegawai yang mengajukan jadwal WFA Bimbingan.'}
           </p>
           {isAnyFilterActive && (
