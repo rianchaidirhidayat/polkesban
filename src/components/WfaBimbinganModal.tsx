@@ -450,7 +450,7 @@ export const WfaBimbinganModal: React.FC<WfaBimbinganModalProps> = ({
             searched: true,
             found: true,
             submission: matched,
-            statusText: 'pengajuan WFA anda pada tanggal tersebut sudah "VALID dan Sudah terjadwal WFA"',
+            statusText: 'pengajuan WFA anda pada tanggal tersebut sudah "VALID dan Sudah terjadwal WFA di e-Office Mobile"',
             isSuccessState: true,
           });
         } else if (matched.status === 'Ditolak') {
@@ -1294,7 +1294,7 @@ export const WfaBimbinganModal: React.FC<WfaBimbinganModalProps> = ({
 
                           {/* Required exact phrasing */}
                           <h3 className="text-base sm:text-xl font-black text-white leading-snug">
-                            pengajuan WFA anda telah &quot;VALID dan Sudah terjadwal WFA&quot;
+                            pengajuan WFA anda telah &quot;VALID dan Sudah terjadwal WFA di e-Office Mobile&quot;
                           </h3>
                         </div>
 
