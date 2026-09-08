@@ -18,9 +18,10 @@ import {
   Firestore
 } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
-import { MenuItem, MicrositeProfile, ClickLog, WfaSubmission, WfaValidationStatus } from '../types';
+import { MenuItem, MicrositeProfile, ClickLog, WfaSubmission, WfaValidationStatus, KebugaranSubmission } from '../types';
 import { INITIAL_MENUS, INITIAL_PROFILE, INITIAL_CLICK_LOGS } from '../data/initialData';
 import { INITIAL_WFA_SUBMISSIONS } from '../data/employeeDatabase';
+import { INITIAL_KEBUGARAN_SUBMISSIONS } from '../data/kebugaranInitialData';
 import { optimizeImageForStorage } from '../utils/imageOptimizer';
 
 // Initialize Firebase App
@@ -496,6 +497,124 @@ export async function deleteWfaSubmissionInCloud(
   } catch (err: any) {
     console.error('Failed to delete WFA submission:', err);
     return { success: false, error: err?.message || 'Gagal menghapus data pengajuan.' };
+  }
+}
+
+const KEBUGARAN_COLLECTION = 'kebugaran_submissions';
+
+/**
+ * Real-time listener for Kebugaran Submissions
+ */
+export function subscribeToKebugaranSubmissions(
+  onUpdate: (submissions: KebugaranSubmission[]) => void,
+  onError?: (error: any) => void
+) {
+  try {
+    const colRef = collection(db, KEBUGARAN_COLLECTION);
+    return onSnapshot(
+      colRef,
+      (snapshot) => {
+        if (snapshot.empty) {
+          onUpdate(INITIAL_KEBUGARAN_SUBMISSIONS);
+          return;
+        }
+
+        const list: KebugaranSubmission[] = [];
+        snapshot.forEach((docSnap) => {
+          const d = docSnap.data();
+          if (d) {
+            list.push({
+              id: docSnap.id,
+              tanggalPeriksa: d.tanggalPeriksa || '',
+              periode: d.periode || 'Triwulan I',
+              nip: d.nip || '',
+              namaPegawai: d.namaPegawai || '',
+              tanggalLahir: d.tanggalLahir || '',
+              unitKerja: d.unitKerja || '',
+              nik: d.nik || '',
+              tensiSistolik: Number(d.tensiSistolik) || 120,
+              tensiDiastolik: Number(d.tensiDiastolik) || 80,
+              beratBadan: Number(d.beratBadan) || 60,
+              tinggiBadan: Number(d.tinggiBadan) || 160,
+              lingkarPinggang: Number(d.lingkarPinggang) || 75,
+              tipeGulaDarah: d.tipeGulaDarah || 'GDS',
+              gulaDarah: Number(d.gulaDarah) || 100,
+              kolesterol: Number(d.kolesterol) || 180,
+              nomorWa: d.nomorWa || '',
+              fasyankes: d.fasyankes || 'Klinik Pratama Poltekkes Kemenkes Bandung',
+              catatan: d.catatan || '',
+              createdAt: d.createdAt || new Date().toISOString(),
+            });
+          }
+        });
+
+        // In-memory sorting by createdAt descending
+        list.sort((a, b) => {
+          const timeA = new Date(a.createdAt || 0).getTime();
+          const timeB = new Date(b.createdAt || 0).getTime();
+          return timeB - timeA;
+        });
+
+        onUpdate(list);
+      },
+      (err) => {
+        console.warn('Firestore kebugaran_submissions subscription error:', err);
+        if (onError) onError(err);
+      }
+    );
+  } catch (e) {
+    console.warn('Failed to setup kebugaran_submissions listener:', e);
+    return () => {};
+  }
+}
+
+/**
+ * Create new Kebugaran Submission in Cloud Firestore
+ */
+export async function createKebugaranSubmissionInCloud(
+  submissionData: Omit<KebugaranSubmission, 'id' | 'createdAt'>
+): Promise<{ success: boolean; submission?: KebugaranSubmission; error?: string }> {
+  try {
+    const colRef = collection(db, KEBUGARAN_COLLECTION);
+    const now = new Date().toISOString();
+
+    const payload = sanitizeForFirestore({
+      ...submissionData,
+      createdAt: now,
+      serverTimestamp: serverTimestamp(),
+    });
+
+    const docAdded = await addDoc(colRef, payload);
+
+    const fullSubmission: KebugaranSubmission = {
+      id: docAdded.id,
+      ...submissionData,
+      createdAt: now,
+    };
+
+    return { success: true, submission: fullSubmission };
+  } catch (err: any) {
+    console.error('Failed to create Kebugaran submission in Cloud Firestore:', err);
+    return {
+      success: false,
+      error: err?.message || 'Gagal menyimpan data kebugaran ke cloud database.',
+    };
+  }
+}
+
+/**
+ * Delete Kebugaran submission from Cloud Firestore
+ */
+export async function deleteKebugaranSubmissionInCloud(
+  submissionId: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const docRef = doc(db, KEBUGARAN_COLLECTION, submissionId);
+    await deleteDoc(docRef);
+    return { success: true };
+  } catch (err: any) {
+    console.error('Failed to delete Kebugaran submission:', err);
+    return { success: false, error: err?.message || 'Gagal menghapus data kebugaran.' };
   }
 }
 

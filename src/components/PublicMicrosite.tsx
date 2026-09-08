@@ -23,7 +23,8 @@ import {
   Lock
 } from 'lucide-react';
 import { WfaBimbinganModal } from './WfaBimbinganModal';
-import { WfaSubmission } from '../types';
+import { KebugaranModal } from './KebugaranModal';
+import { WfaSubmission, KebugaranSubmission } from '../types';
 
 interface PublicMicrositeProps {
   profile: MicrositeProfile;
@@ -35,6 +36,8 @@ interface PublicMicrositeProps {
   lastPublishedAt?: string | null;
   wfaSubmissions?: WfaSubmission[];
   onSubmitWfa?: (submission: Omit<WfaSubmission, 'id' | 'status' | 'createdAt'>) => Promise<{ success: boolean; error?: string }>;
+  kebugaranSubmissions?: KebugaranSubmission[];
+  onSubmitKebugaran?: (submission: Omit<KebugaranSubmission, 'id' | 'createdAt'>) => Promise<{ success: boolean; error?: string }>;
 }
 
 export const PublicMicrosite: React.FC<PublicMicrositeProps> = ({
@@ -47,11 +50,14 @@ export const PublicMicrosite: React.FC<PublicMicrositeProps> = ({
   lastPublishedAt,
   wfaSubmissions = [],
   onSubmitWfa,
+  kebugaranSubmissions = [],
+  onSubmitKebugaran,
 }) => {
   const [selectedCategory, setSelectedCategory] = useState<string>('Semua');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [pinModalMenu, setPinModalMenu] = useState<MenuItem | null>(null);
   const [isWfaModalOpen, setIsWfaModalOpen] = useState<boolean>(false);
+  const [isKebugaranModalOpen, setIsKebugaranModalOpen] = useState<boolean>(false);
 
   const theme = profile.theme;
 
@@ -110,6 +116,16 @@ export const PublicMicrosite: React.FC<PublicMicrositeProps> = ({
     );
   };
 
+  const isKebugaranMenu = (menu: MenuItem) => {
+    return (
+      menu.id === 'menu-kebugaran-jasmani' ||
+      menu.url === '#input-kebugaran' ||
+      menu.title?.toLowerCase().includes('data kebugaran') ||
+      menu.title?.toLowerCase().includes('input data kebugaran') ||
+      menu.title?.toLowerCase().includes('tes kebugaran')
+    );
+  };
+
   // Handle menu click - intercepts PIN protected menus
   const handleButtonClick = (menu: MenuItem) => {
     if (menu.isProtected && menu.pinCode && menu.pinCode.trim() !== '') {
@@ -121,6 +137,13 @@ export const PublicMicrosite: React.FC<PublicMicrositeProps> = ({
     if (isWfaMenu(menu)) {
       onMenuClick(menu);
       setIsWfaModalOpen(true);
+      return;
+    }
+
+    // Intercept Formulir Input Data Kebugaran to show floating modal
+    if (isKebugaranMenu(menu)) {
+      onMenuClick(menu);
+      setIsKebugaranModalOpen(true);
       return;
     }
 
@@ -137,7 +160,12 @@ export const PublicMicrosite: React.FC<PublicMicrositeProps> = ({
       return;
     }
 
-    if (verifiedMenu.url && verifiedMenu.url !== '#wfa-bimbingan') {
+    if (isKebugaranMenu(verifiedMenu)) {
+      setIsKebugaranModalOpen(true);
+      return;
+    }
+
+    if (verifiedMenu.url && verifiedMenu.url !== '#wfa-bimbingan' && verifiedMenu.url !== '#input-kebugaran') {
       window.open(verifiedMenu.url, verifiedMenu.openInNewTab ? '_blank' : '_self', 'noopener,noreferrer');
     }
   };
@@ -567,6 +595,15 @@ export const PublicMicrosite: React.FC<PublicMicrositeProps> = ({
         allSubmissions={wfaSubmissions}
         logoUrl={profile.avatarUrl}
         osdmContactWa={profile.osdmContactWa || '08119712525'}
+      />
+
+      {/* Floating Modal: Formulir Input Data Kebugaran Pegawai */}
+      <KebugaranModal
+        isOpen={isKebugaranModalOpen}
+        onClose={() => setIsKebugaranModalOpen(false)}
+        onSubmit={onSubmitKebugaran || (async () => ({ success: true }))}
+        allSubmissions={kebugaranSubmissions}
+        logoUrl={profile.avatarUrl}
       />
     </div>
   );

@@ -140,6 +140,33 @@ export const INITIAL_MENUS: MenuItem[] = [
     openInNewTab: false
   },
   {
+    id: 'menu-kebugaran-jasmani',
+    title: '🏃 Formulir Input Data Kebugaran',
+    subtitle: 'Pencatatan data kesehatan & tes kebugaran berkala pegawai (Triwulan I s.d IV)',
+    url: '#input-kebugaran',
+    type: 'custom',
+    size: 'featured',
+    bgColor: '#0284c7',
+    textColor: '#ffffff',
+    borderColor: '#38bdf8',
+    isGradient: true,
+    gradientTo: '#0369a1',
+    gradientAngle: 135,
+    iconName: 'Activity',
+    badgeText: '❤️ TES KEBUGARAN',
+    badgeBgColor: '#e0f2fe',
+    badgeTextColor: '#0369a1',
+    isActive: true,
+    order: 2,
+    animation: 'pulse',
+    clickCount: 450,
+    category: 'Kepegawaian & Presensi',
+    openInNewTab: false,
+    isProtected: false,
+    pinCode: '',
+    pinHint: 'PIN akses formulir input data kebugaran'
+  },
+  {
     id: 'menu-1',
     title: '🕒 Presensi & Absensi Online Pegawai',
     subtitle: 'Presensi harian dosen & tendik, pantau kehadiran, clock-in/out, rekap shift kerja',
@@ -404,12 +431,15 @@ export const CATEGORIES_PRESET = [
 ];
 
 export const DEFAULT_WFA_MENU: MenuItem = INITIAL_MENUS[0];
+export const DEFAULT_KEBUGARAN_MENU: MenuItem = INITIAL_MENUS[1];
 
 export const ensureHasWfaMenu = (menuList: MenuItem[]): MenuItem[] => {
   if (!Array.isArray(menuList) || menuList.length === 0) {
     return INITIAL_MENUS;
   }
-  const hasWfa = menuList.some(
+  let result = [...menuList];
+
+  const hasWfa = result.some(
     (m) =>
       m.id === 'menu-wfa-bimbingan' ||
       m.url === '#wfa-bimbingan' ||
@@ -417,7 +447,24 @@ export const ensureHasWfaMenu = (menuList: MenuItem[]): MenuItem[] => {
       m.title?.toLowerCase().includes('formulir pengajuan wfa')
   );
   if (!hasWfa) {
-    return [DEFAULT_WFA_MENU, ...menuList];
+    result.unshift(DEFAULT_WFA_MENU);
   }
-  return menuList;
+
+  const hasKebugaran = result.some(
+    (m) =>
+      m.id === 'menu-kebugaran-jasmani' ||
+      m.url === '#input-kebugaran' ||
+      m.title?.toLowerCase().includes('kebugaran')
+  );
+  if (!hasKebugaran) {
+    const wfaIdx = result.findIndex((m) => m.id === 'menu-wfa-bimbingan' || m.url === '#wfa-bimbingan');
+    if (wfaIdx !== -1) {
+      result.splice(wfaIdx + 1, 0, DEFAULT_KEBUGARAN_MENU);
+    } else {
+      result.unshift(DEFAULT_KEBUGARAN_MENU);
+    }
+  }
+
+  return result;
 };
+

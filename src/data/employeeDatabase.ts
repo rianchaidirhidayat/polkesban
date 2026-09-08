@@ -3222,3 +3222,14 @@ export const INITIAL_WFA_SUBMISSIONS: WfaSubmission[] = [
     createdAt: new Date(Date.now() - 1000 * 60 * 45).toISOString(),
   }
 ];
+
+export const getPoltekkesUnitKerjaList = (): string[] => {
+  const units = new Set<string>();
+  POLTEKKES_EMPLOYEES.forEach((emp) => {
+    if (emp.unitKerja && emp.unitKerja.trim()) {
+      units.add(emp.unitKerja.trim());
+    }
+  });
+  return Array.from(units).sort((a, b) => a.localeCompare(b, 'id'));
+};
+

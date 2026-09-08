@@ -158,4 +158,32 @@ export interface EmployeeRecord {
   jabatan: string;
   email?: string;
   nomorWa?: string;
+  tanggalLahir?: string;
+  nik?: string;
+}
+
+export type KebugaranPeriode = 'Triwulan I' | 'Triwulan II' | 'Triwulan III' | 'Triwulan IV';
+export type GulaDarahType = 'GDS' | 'GDP';
+
+export interface KebugaranSubmission {
+  id: string;
+  tanggalPeriksa: string; // YYYY-MM-DD
+  periode: KebugaranPeriode; // 'Triwulan I' s.d 'Triwulan IV'
+  nip: string;
+  namaPegawai: string;
+  tanggalLahir: string; // YYYY-MM-DD or formatted string
+  unitKerja: string;
+  nik: string;
+  tensiSistolik: number; // mmHg
+  tensiDiastolik: number; // mmHg
+  beratBadan: number; // kg
+  tinggiBadan: number; // cm
+  lingkarPinggang: number; // cm
+  tipeGulaDarah: GulaDarahType; // 'GDS' | 'GDP'
+  gulaDarah: number; // mg/dL
+  kolesterol: number; // mg/dL
+  nomorWa: string;
+  fasyankes: string; // Fasyankes pemeriksaan kebugaran
+  catatan?: string;
+  createdAt: string; // ISO string
 }

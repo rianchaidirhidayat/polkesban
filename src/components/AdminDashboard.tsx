@@ -49,13 +49,15 @@ import {
   FileSignature,
   Share2,
   RefreshCw,
+  Activity,
 } from 'lucide-react';
-import { MenuItem, MicrositeProfile, ClickLog, ButtonSize, ThemeConfig, WfaSubmission, WfaValidationStatus } from '../types';
+import { MenuItem, MicrositeProfile, ClickLog, ButtonSize, ThemeConfig, WfaSubmission, WfaValidationStatus, KebugaranSubmission } from '../types';
 import { THEME_PRESETS, CATEGORIES_PRESET } from '../data/initialData';
 import { getIconComponent } from '../utils/iconMap';
 import { AdminMenuEditorModal } from './AdminMenuEditorModal';
 import { AnalyticsView } from './AnalyticsView';
 import { WfaMonitoringView } from './WfaMonitoringView';
+import { KebugaranMonitoringView } from './KebugaranMonitoringView';
 import { PublicMicrosite } from './PublicMicrosite';
 import { exportToCSV, exportToPDF } from '../utils/exportUtils';
 import { optimizeImageForStorage } from '../utils/imageOptimizer';
@@ -83,6 +85,10 @@ interface AdminDashboardProps {
   onUpdateWfaStatus?: (id: string, status: WfaValidationStatus, notes?: string) => Promise<{ success: boolean; error?: string }>;
   onDeleteWfaSubmission?: (id: string) => Promise<{ success: boolean; error?: string }>;
   onRefreshWfa?: () => void;
+  kebugaranSubmissions?: KebugaranSubmission[];
+  onDeleteKebugaranSubmission?: (id: string) => Promise<{ success: boolean; error?: string }>;
+  onRefreshKebugaran?: () => void;
+  onOpenKebugaranModal?: () => void;
 }
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({
@@ -108,8 +114,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   onUpdateWfaStatus,
   onDeleteWfaSubmission,
   onRefreshWfa,
+  kebugaranSubmissions = [],
+  onDeleteKebugaranSubmission,
+  onRefreshKebugaran,
+  onOpenKebugaranModal,
 }) => {
-  const [activeTab, setActiveTab] = useState<'menus' | 'theme' | 'analytics' | 'wfa_monitoring' | 'export' | 'security'>('menus');
+  const [activeTab, setActiveTab] = useState<'menus' | 'theme' | 'analytics' | 'wfa_monitoring' | 'kebugaran_monitoring' | 'export' | 'security'>('menus');
   const [editingMenu, setEditingMenu] = useState<MenuItem | null>(null);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [showLiveSidePreview, setShowLiveSidePreview] = useState(true);
@@ -369,6 +379,21 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 {wfaSubmissions.filter(s => s.status === 'Menunggu Validasi').length}
               </span>
             )}
+          </button>
+
+          <button
+            onClick={() => setActiveTab('kebugaran_monitoring')}
+            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-md text-xs font-medium transition-all relative ${
+              activeTab === 'kebugaran_monitoring'
+                ? 'bg-sky-600 text-white shadow-xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/70'
+            }`}
+          >
+            <Activity className="w-3.5 h-3.5 text-sky-400" />
+            <span>Monitoring Kebugaran</span>
+            <span className="px-1.5 py-0.2 rounded-full bg-sky-500 text-white font-black text-[10px]">
+              {kebugaranSubmissions.length}
+            </span>
           </button>
 
           <button
@@ -2110,6 +2135,27 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               />
             )}
 
+            {/* TAB: MONITORING TES KEBUGARAN PEGAWAI */}
+            {activeTab === 'kebugaran_monitoring' && (
+              <KebugaranMonitoringView
+                submissions={kebugaranSubmissions}
+                onOpenInputModal={onOpenKebugaranModal}
+                onDeleteSubmission={onDeleteKebugaranSubmission}
+                onRefresh={onRefreshKebugaran}
+                kebugaranMenu={menus.find((m) => m.id === 'menu-kebugaran-jasmani' || m.url === '#input-kebugaran')}
+                onUpdateMenuPin={(menuId, isProtected, pinCode) => {
+                  setMenus((prev) =>
+                    prev.map((m) =>
+                      m.id === menuId
+                        ? { ...m, isProtected, pinCode, pinHint: isProtected ? 'Masukkan PIN Formulir Kebugaran' : '' }
+                        : m
+                    )
+                  );
+                  triggerSaveFeedback();
+                }}
+              />
+            )}
+
             {/* TAB 4: EKSPOR LAPORAN */}
             {activeTab === 'export' && (
               <div className="space-y-6">
@@ -2470,6 +2516,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       }}
                       onOpenQR={onOpenQR}
                       isStandalone={false}
+                      wfaSubmissions={wfaSubmissions}
+                      kebugaranSubmissions={kebugaranSubmissions}
                     />
                   </div>
 

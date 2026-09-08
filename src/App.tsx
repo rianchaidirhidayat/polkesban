@@ -4,9 +4,11 @@ import { PublicMicrosite } from './components/PublicMicrosite';
 import { AdminDashboard } from './components/AdminDashboard';
 import { QRCodeModal } from './components/QRCodeModal';
 import { AdminAuthModal } from './components/AdminAuthModal';
-import { MenuItem, MicrositeProfile, ClickLog, WfaSubmission, WfaValidationStatus } from './types';
+import { MenuItem, MicrositeProfile, ClickLog, WfaSubmission, WfaValidationStatus, KebugaranSubmission } from './types';
 import { INITIAL_MENUS, INITIAL_PROFILE, INITIAL_CLICK_LOGS, ensureHasWfaMenu } from './data/initialData';
 import { INITIAL_WFA_SUBMISSIONS } from './data/employeeDatabase';
+import { INITIAL_KEBUGARAN_SUBMISSIONS } from './data/kebugaranInitialData';
+import { KebugaranModal } from './components/KebugaranModal';
 import { motion, AnimatePresence } from 'motion/react';
 import { CheckCheck, Sparkles, Send, Cloud, CloudCheck, Wifi } from 'lucide-react';
 import { 
@@ -21,7 +23,10 @@ import {
   subscribeToWfaSubmissions,
   createWfaSubmissionInCloud,
   updateWfaStatusInCloud,
-  deleteWfaSubmissionInCloud
+  deleteWfaSubmissionInCloud,
+  subscribeToKebugaranSubmissions,
+  createKebugaranSubmissionInCloud,
+  deleteKebugaranSubmissionInCloud
 } from './lib/firebase';
 
 const LOCAL_STORAGE_MENUS_KEY = 'direct_menu_items_v2';
@@ -30,6 +35,7 @@ const LOCAL_STORAGE_LOGS_KEY = 'direct_menu_logs_v2';
 const LOCAL_STORAGE_ADMIN_PIN_KEY = 'direct_menu_admin_pin_v2';
 const SESSION_ADMIN_AUTH_KEY = 'direct_menu_admin_auth_v2';
 const LOCAL_STORAGE_WFA_SUBMISSIONS_KEY = 'direct_menu_wfa_submissions_v1';
+const LOCAL_STORAGE_KEBUGARAN_SUBMISSIONS_KEY = 'direct_menu_kebugaran_submissions_v1';
 
 // Live published storage keys (what employees see on public page)
 const LOCAL_STORAGE_LIVE_MENUS_KEY = 'direct_menu_live_items_v2';
@@ -134,6 +140,19 @@ export default function App() {
     }
     return INITIAL_WFA_SUBMISSIONS;
   });
+
+  // Kebugaran Jasmani Submissions state
+  const [kebugaranSubmissions, setKebugaranSubmissions] = useState<KebugaranSubmission[]>(() => {
+    try {
+      const saved = localStorage.getItem(LOCAL_STORAGE_KEBUGARAN_SUBMISSIONS_KEY);
+      if (saved) return JSON.parse(saved);
+    } catch {
+      // ignore
+    }
+    return INITIAL_KEBUGARAN_SUBMISSIONS;
+  });
+
+  const [isAdminKebugaranModalOpen, setIsAdminKebugaranModalOpen] = useState(false);
 
   // 1. Real-time Cloud Sync for Live Portal across all devices
   useEffect(() => {
@@ -446,24 +465,57 @@ export default function App() {
     }
   }, [wfaSubmissions]);
 
-  // Ensure WFA Bimbingan menu exists in menus & liveMenus
+  // Real-time Cloud Sync for Kebugaran Submissions
   useEffect(() => {
-    setMenus((prev) => {
-      const hasWfa = prev.some((m) => m.id === 'menu-wfa-bimbingan' || m.url === '#wfa-bimbingan');
-      if (!hasWfa) {
-        const wfaMenu = INITIAL_MENUS.find((m) => m.id === 'menu-wfa-bimbingan');
-        if (wfaMenu) return [wfaMenu, ...prev];
+    const unsubscribe = subscribeToKebugaranSubmissions((cloudSubmissions) => {
+      if (Array.isArray(cloudSubmissions)) {
+        setKebugaranSubmissions(cloudSubmissions);
       }
-      return prev;
     });
-    setLiveMenus((prev) => {
-      const hasWfa = prev.some((m) => m.id === 'menu-wfa-bimbingan' || m.url === '#wfa-bimbingan');
-      if (!hasWfa) {
-        const wfaMenu = INITIAL_MENUS.find((m) => m.id === 'menu-wfa-bimbingan');
-        if (wfaMenu) return [wfaMenu, ...prev];
+    return () => unsubscribe();
+  }, []);
+
+  // Multi-tab sync channel for Kebugaran operations
+  useEffect(() => {
+    let kebugaranChannel: BroadcastChannel | null = null;
+    if (typeof BroadcastChannel !== 'undefined') {
+      try {
+        kebugaranChannel = new BroadcastChannel('kebugaran_sync_channel');
+        kebugaranChannel.onmessage = (event) => {
+          if (event.data?.type === 'KEBUGARAN_DELETE' && event.data.id) {
+            setKebugaranSubmissions((prev) => prev.filter((s) => s.id !== event.data.id));
+          } else if (event.data?.type === 'KEBUGARAN_NEW' && event.data.submission) {
+            setKebugaranSubmissions((prev) => [
+              event.data.submission,
+              ...prev.filter((s) => s.id !== event.data.submission.id),
+            ]);
+          }
+        };
+      } catch (err) {
+        console.warn('Kebugaran BroadcastChannel setup error:', err);
       }
-      return prev;
-    });
+    }
+
+    return () => {
+      if (kebugaranChannel) {
+        kebugaranChannel.close();
+      }
+    };
+  }, []);
+
+  // Sync Kebugaran Submissions to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem(LOCAL_STORAGE_KEBUGARAN_SUBMISSIONS_KEY, JSON.stringify(kebugaranSubmissions));
+    } catch {
+      // ignore
+    }
+  }, [kebugaranSubmissions]);
+
+  // Ensure WFA & Kebugaran menus exist in menus & liveMenus
+  useEffect(() => {
+    setMenus((prev) => ensureHasWfaMenu(prev));
+    setLiveMenus((prev) => ensureHasWfaMenu(prev));
   }, []);
 
   const handleCreateWfaSubmission = async (data: Omit<WfaSubmission, 'id' | 'status' | 'createdAt'>) => {
@@ -582,6 +634,90 @@ export default function App() {
       return { success: true };
     } catch (err: any) {
       console.error('Cloud WFA delete failed, removed locally:', err);
+      return { success: true };
+    }
+  };
+
+  const handleCreateKebugaranSubmission = async (data: Omit<KebugaranSubmission, 'id' | 'createdAt'>) => {
+    // Duplicate rejection: Pegawai tidak boleh mengisi formulir kebugaran pada periode yang sama dua kali
+    const cleanNip = data.nip.replace(/[\s.-]/g, '').trim();
+    const cleanPeriode = data.periode.trim();
+
+    const isDuplicate = kebugaranSubmissions.some((sub) => {
+      const subNip = sub.nip.replace(/[\s.-]/g, '').trim();
+      return subNip === cleanNip && sub.periode.toLowerCase() === cleanPeriode.toLowerCase();
+    });
+
+    if (isDuplicate) {
+      return {
+        success: false,
+        error: `Data Ditolak: Pegawai dengan NIP ${data.nip} (${data.namaPegawai}) sudah terdaftar mengisi formulir data kebugaran untuk ${data.periode}. Setiap pegawai hanya mengisi 1 kali per periode triwulan.`,
+      };
+    }
+
+    try {
+      const res = await createKebugaranSubmissionInCloud(data);
+      if (res.success && res.submission) {
+        const newSub = res.submission;
+        setKebugaranSubmissions((prev) => [newSub, ...prev.filter((s) => s.id !== newSub.id)]);
+
+        try {
+          if (typeof BroadcastChannel !== 'undefined') {
+            const bc = new BroadcastChannel('kebugaran_sync_channel');
+            bc.postMessage({ type: 'KEBUGARAN_NEW', submission: newSub });
+            bc.close();
+          }
+        } catch {}
+
+        return { success: true, submission: newSub };
+      }
+      throw new Error(res.error || 'Gagal menyimpan ke server');
+    } catch (err: any) {
+      console.error('Cloud Kebugaran submission failed, saving locally:', err);
+      const localSub: KebugaranSubmission = {
+        ...data,
+        id: `kbg-${Date.now()}`,
+        createdAt: new Date().toISOString(),
+      };
+      setKebugaranSubmissions((prev) => [localSub, ...prev]);
+
+      try {
+        if (typeof BroadcastChannel !== 'undefined') {
+          const bc = new BroadcastChannel('kebugaran_sync_channel');
+          bc.postMessage({ type: 'KEBUGARAN_NEW', submission: localSub });
+          bc.close();
+        }
+      } catch {}
+
+      return { success: true, submission: localSub };
+    }
+  };
+
+  const handleDeleteKebugaranSubmission = async (id: string) => {
+    // 1. Optimistic local delete
+    setKebugaranSubmissions((prev) => {
+      const filtered = prev.filter((s) => s.id !== id);
+      try {
+        localStorage.setItem(LOCAL_STORAGE_KEBUGARAN_SUBMISSIONS_KEY, JSON.stringify(filtered));
+      } catch {}
+      return filtered;
+    });
+
+    // 2. Broadcast to other tabs
+    try {
+      if (typeof BroadcastChannel !== 'undefined') {
+        const bc = new BroadcastChannel('kebugaran_sync_channel');
+        bc.postMessage({ type: 'KEBUGARAN_DELETE', id });
+        bc.close();
+      }
+    } catch {}
+
+    // 3. Delete from Cloud Firestore
+    try {
+      await deleteKebugaranSubmissionInCloud(id);
+      return { success: true };
+    } catch (err: any) {
+      console.error('Cloud Kebugaran delete failed, removed locally:', err);
       return { success: true };
     }
   };
@@ -904,6 +1040,8 @@ export default function App() {
               lastPublishedAt={lastPublishedAt}
               wfaSubmissions={wfaSubmissions}
               onSubmitWfa={handleCreateWfaSubmission}
+              kebugaranSubmissions={kebugaranSubmissions}
+              onSubmitKebugaran={handleCreateKebugaranSubmission}
             />
           </div>
         )}
@@ -932,6 +1070,9 @@ export default function App() {
             wfaSubmissions={wfaSubmissions}
             onUpdateWfaStatus={handleUpdateWfaStatus}
             onDeleteWfaSubmission={handleDeleteWfaSubmission}
+            kebugaranSubmissions={kebugaranSubmissions}
+            onDeleteKebugaranSubmission={handleDeleteKebugaranSubmission}
+            onOpenKebugaranModal={() => setIsAdminKebugaranModalOpen(true)}
           />
         )}
 
@@ -962,6 +1103,9 @@ export default function App() {
                 wfaSubmissions={wfaSubmissions}
                 onUpdateWfaStatus={handleUpdateWfaStatus}
                 onDeleteWfaSubmission={handleDeleteWfaSubmission}
+                kebugaranSubmissions={kebugaranSubmissions}
+                onDeleteKebugaranSubmission={handleDeleteKebugaranSubmission}
+                onOpenKebugaranModal={() => setIsAdminKebugaranModalOpen(true)}
               />
             </div>
 
@@ -986,6 +1130,8 @@ export default function App() {
                   lastPublishedAt={lastPublishedAt}
                   wfaSubmissions={wfaSubmissions}
                   onSubmitWfa={handleCreateWfaSubmission}
+                  kebugaranSubmissions={kebugaranSubmissions}
+                  onSubmitKebugaran={handleCreateKebugaranSubmission}
                 />
               </div>
             </div>
@@ -1102,6 +1248,15 @@ export default function App() {
         onClose={() => setIsQRModalOpen(false)}
         profile={profile}
         publicUrl={window.location.href.split('#')[0].split('?')[0]}
+      />
+
+      {/* Floating Kebugaran Modal (when triggered directly from Admin Monitoring tab) */}
+      <KebugaranModal
+        isOpen={isAdminKebugaranModalOpen}
+        onClose={() => setIsAdminKebugaranModalOpen(false)}
+        onSubmit={handleCreateKebugaranSubmission}
+        allSubmissions={kebugaranSubmissions}
+        logoUrl={profile.avatarUrl}
       />
     </div>
   );
