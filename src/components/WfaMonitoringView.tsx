@@ -539,7 +539,7 @@ export const WfaMonitoringView: React.FC<WfaMonitoringViewProps> = ({
                 <MessageCircle className="w-4 h-4" />
               </div>
               <h3 className="text-sm font-bold text-slate-900 tracking-tight">
-                Pengaturan WhatsApp Tim Kerja OSDM (Layanan WFA Bimbingan)
+                Pengaturan Kontak WhatsApp Tim Kerja OSDM (Layanan WFA Bimbingan)
               </h3>
             </div>
             <p className="text-xs text-slate-600 max-w-2xl leading-relaxed">
