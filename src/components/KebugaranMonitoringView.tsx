@@ -40,7 +40,7 @@ import { KebugaranPrintModal } from './KebugaranPrintModal';
 
 interface KebugaranMonitoringViewProps {
   submissions: KebugaranSubmission[];
-  onOpenInputModal: () => void;
+  onOpenInputModal?: () => void;
   onDeleteSubmission?: (id: string) => Promise<{ success: boolean; error?: string }>;
   onRefresh?: () => void;
   kebugaranMenu?: MenuItem;
@@ -281,15 +281,53 @@ export const KebugaranMonitoringView: React.FC<KebugaranMonitoringViewProps> = (
             <FileSpreadsheet className="w-3.5 h-3.5" />
             <span>Tarikan Data Excel</span>
           </button>
+        </div>
+      </div>
 
-          {/* Buka Formulir Input Melayang */}
-          <button
-            onClick={onOpenInputModal}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs font-bold transition-all shadow-md shadow-blue-500/20"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Input Data Kebugaran</span>
-          </button>
+      {/* Info Banner: Direct Link Formulir Kebugaran untuk Pegawai */}
+      <div className="bg-gradient-to-r from-sky-50 via-blue-50 to-indigo-50 border border-sky-200/80 rounded-2xl p-4 shadow-xs">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-start gap-3">
+            <div className="w-9 h-9 rounded-xl bg-sky-600 text-white flex items-center justify-center shrink-0 shadow-xs mt-0.5">
+              <Link2 className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-xs sm:text-sm font-bold text-slate-900">
+                  Direct Link Menu: Formulir Kebugaran Pegawai
+                </h3>
+                <span className="px-2 py-0.5 rounded-md bg-sky-100 text-sky-800 text-[10px] font-bold">
+                  Sama Seperti WFA
+                </span>
+              </div>
+              <p className="text-xs text-slate-600 mt-0.5 max-w-2xl leading-relaxed">
+                Pegawai menginput data kebugaran secara mandiri melalui tombol menu di portal. Untuk membuat tombol menu kustom di tab <strong>Pengelola Menu</strong>, masukkan URL Direct:
+              </p>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <code className="px-2.5 py-1 rounded-lg bg-white border border-sky-300 text-sky-900 font-mono text-xs font-bold shadow-2xs select-all">
+                  #input-kebugaran
+                </code>
+                <span className="text-[11px] text-slate-500">atau tautan penuh:</span>
+                <code className="px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-slate-700 font-mono text-[11px] truncate max-w-xs select-all">
+                  {typeof window !== 'undefined' ? `${window.location.origin}${window.location.pathname}#input-kebugaran` : '#input-kebugaran'}
+                </code>
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+            <button
+              type="button"
+              onClick={handleCopyFormLink}
+              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all shadow-xs ${
+                copiedLink
+                  ? 'bg-emerald-600 text-white'
+                  : 'bg-white hover:bg-slate-50 border border-slate-200 text-slate-800'
+              }`}
+            >
+              {copiedLink ? <Check className="w-4 h-4" /> : <Link2 className="w-4 h-4 text-sky-600" />}
+              <span>{copiedLink ? 'Tersalin ke Clipboard!' : 'Salin Direct Link'}</span>
+            </button>
+          </div>
         </div>
       </div>
 

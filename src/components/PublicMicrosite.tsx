@@ -111,6 +111,7 @@ export const PublicMicrosite: React.FC<PublicMicrositeProps> = ({
     return (
       menu.id === 'menu-wfa-bimbingan' ||
       menu.url === '#wfa-bimbingan' ||
+      menu.url?.includes('#wfa-bimbingan') ||
       menu.title?.toLowerCase().includes('wfa bimbingan') ||
       menu.title?.toLowerCase().includes('formulir pengajuan wfa')
     );
@@ -120,6 +121,7 @@ export const PublicMicrosite: React.FC<PublicMicrositeProps> = ({
     return (
       menu.id === 'menu-kebugaran-jasmani' ||
       menu.url === '#input-kebugaran' ||
+      menu.url?.includes('#input-kebugaran') ||
       menu.title?.toLowerCase().includes('data kebugaran') ||
       menu.title?.toLowerCase().includes('input data kebugaran') ||
       menu.title?.toLowerCase().includes('tes kebugaran')
@@ -165,7 +167,7 @@ export const PublicMicrosite: React.FC<PublicMicrositeProps> = ({
       return;
     }
 
-    if (verifiedMenu.url && verifiedMenu.url !== '#wfa-bimbingan' && verifiedMenu.url !== '#input-kebugaran') {
+    if (verifiedMenu.url && !isWfaMenu(verifiedMenu) && !isKebugaranMenu(verifiedMenu)) {
       window.open(verifiedMenu.url, verifiedMenu.openInNewTab ? '_blank' : '_self', 'noopener,noreferrer');
     }
   };

@@ -392,18 +392,74 @@ export const AdminMenuEditorModal: React.FC<AdminMenuEditorModalProps> = ({
 
                   {/* Direct URL */}
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                      URL Akses / Direct Link
-                    </label>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="block text-xs font-semibold text-slate-700">
+                        URL Akses / Direct Link
+                      </label>
+                      <span className="text-[10px] text-slate-500">
+                        Bisa link eksternal atau form internal portal
+                      </span>
+                    </div>
                     <div className="relative">
                       <input
                         type="text"
-                        placeholder="https://hris.internal/..."
+                        placeholder="https://... atau #input-kebugaran"
                         value={formData.url}
                         onChange={(e) => setFormData({ ...formData, url: e.target.value })}
                         className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-mono text-slate-900 placeholder-slate-400 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-colors"
                       />
                       <LinkIcon className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    </div>
+
+                    {/* Quick Internal Form Presets */}
+                    <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                      <span className="text-[10px] font-bold text-slate-500 mr-1">Direct Form Preset:</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFormData((prev) => ({
+                            ...prev,
+                            url: '#input-kebugaran',
+                            title: prev.title || 'Formulir Input Data Kebugaran',
+                            subtitle: prev.subtitle || 'Pencatatan data kesehatan & tes kebugaran berkala pegawai',
+                            icon: prev.icon === 'Link' ? 'Activity' : prev.icon,
+                            badgeText: prev.badgeText || 'TES KEBUGARAN',
+                            badgeColor: prev.badgeColor || '#0284c7',
+                            type: 'link',
+                          }));
+                        }}
+                        className={`px-2 py-1 rounded-md text-[11px] font-semibold border transition-all flex items-center gap-1 ${
+                          formData.url === '#input-kebugaran'
+                            ? 'bg-sky-50 border-sky-300 text-sky-800 font-bold'
+                            : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700'
+                        }`}
+                        title="Klik untuk set URL ke Formulir Input Kebugaran Pegawai"
+                      >
+                        <span>🏃 #input-kebugaran</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFormData((prev) => ({
+                            ...prev,
+                            url: '#wfa-bimbingan',
+                            title: prev.title || 'Formulir Pengajuan WFA',
+                            subtitle: prev.subtitle || 'Pengajuan kerja fleksibel & bimbingan tugas belajar',
+                            icon: prev.icon === 'Link' ? 'FileSignature' : prev.icon,
+                            badgeText: prev.badgeText || 'E-APPROVAL',
+                            type: 'link',
+                          }));
+                        }}
+                        className={`px-2 py-1 rounded-md text-[11px] font-semibold border transition-all flex items-center gap-1 ${
+                          formData.url === '#wfa-bimbingan'
+                            ? 'bg-blue-50 border-blue-300 text-blue-800 font-bold'
+                            : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700'
+                        }`}
+                        title="Klik untuk set URL ke Formulir Pengajuan WFA"
+                      >
+                        <span>📋 #wfa-bimbingan</span>
+                      </button>
                     </div>
                   </div>
 
