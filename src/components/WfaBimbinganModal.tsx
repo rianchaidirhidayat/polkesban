@@ -1137,7 +1137,7 @@ export const WfaBimbinganModal: React.FC<WfaBimbinganModalProps> = ({
                           <input
                             id={`${formId}-link-surat-tugas`}
                             type="url"
-                            placeholder="https://tautan Google Drive surat tugas resmi"
+                            placeholder="https://tautan folder Google Drive surat tugas resmi"
                             value={linkSuratTugas}
                             onChange={(e) => {
                               setLinkSuratTugas(e.target.value);
