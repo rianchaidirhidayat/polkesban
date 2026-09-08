@@ -31,7 +31,9 @@ import {
   subscribeToKebugaranSubmissions,
   getKebugaranSubmissionsOnce,
   createKebugaranSubmissionInCloud,
-  deleteKebugaranSubmissionInCloud
+  deleteKebugaranSubmissionInCloud,
+  subscribeToQuotaExceeded,
+  getIsQuotaExceeded
 } from './lib/firebase';
 
 const LOCAL_STORAGE_MENUS_KEY = 'direct_menu_items_v2';
@@ -333,19 +335,27 @@ export default function App() {
     };
   }, []);
 
-  // Debounced auto-sync to Cloud Firestore so all devices always stay synchronized in real time
+  // Quota circuit breaker state
+  const [isQuotaLimited, setIsQuotaLimited] = useState(() => getIsQuotaExceeded());
+  useEffect(() => {
+    return subscribeToQuotaExceeded((exceeded) => {
+      setIsQuotaLimited(exceeded);
+    });
+  }, []);
+
+  // Save admin working draft changes (when admin is logged in) with 5s debounce
   const isFirstMountForDraftSync = useRef(true);
   useEffect(() => {
     if (isFirstMountForDraftSync.current) {
       isFirstMountForDraftSync.current = false;
       return;
     }
+    if (isQuotaLimited) return;
     const timer = setTimeout(() => {
-      publishLivePortalToCloud(menus, profile).catch(() => {});
       saveAdminDraftToCloud(menus, profile).catch(() => {});
-    }, 600);
+    }, 5000);
     return () => clearTimeout(timer);
-  }, [menus, profile]);
+  }, [menus, profile, isQuotaLimited]);
 
   // Real-time Cloud Listener for WFA Submissions
   useEffect(() => {

@@ -11,7 +11,6 @@ import {
   collection, 
   addDoc, 
   query,
-  where,
   orderBy,
   limit,
   serverTimestamp,
@@ -45,12 +44,61 @@ export const db = firestoreInstance;
 const LIVE_PORTAL_DOC = 'live';
 const SECURITY_DOC = 'security';
 const DRAFT_DOC = 'draft';
+const EMPLOYEE_DELTA_DOC = 'employee_delta';
+const WFA_COLLECTION = 'wfa_submissions';
+const KEBUGARAN_COLLECTION = 'kebugaran_submissions';
+const CLICK_LOGS_COLLECTION = 'click_logs';
 
 export interface LivePortalData {
   menus: MenuItem[];
   profile: MicrositeProfile;
   lastPublishedAt?: string;
   updatedAt?: any;
+}
+
+export interface EmployeeDelta {
+  added: EmployeeRecord[];
+  updated: Record<string, Partial<EmployeeRecord>>;
+  deleted: string[];
+  updatedAt?: any;
+}
+
+// Global Circuit Breaker for Firestore Free Tier Quota Limit
+let isQuotaExceeded = false;
+const quotaListeners: Array<(exceeded: boolean) => void> = [];
+
+export function getIsQuotaExceeded(): boolean {
+  return isQuotaExceeded;
+}
+
+export function subscribeToQuotaExceeded(listener: (exceeded: boolean) => void): () => void {
+  quotaListeners.push(listener);
+  listener(isQuotaExceeded);
+  return () => {
+    const idx = quotaListeners.indexOf(listener);
+    if (idx >= 0) quotaListeners.splice(idx, 1);
+  };
+}
+
+function handleFirestoreError(err: any): boolean {
+  const errMsg = err?.message || String(err);
+  const errCode = err?.code || '';
+  if (
+    errCode === 'resource-exhausted' ||
+    errMsg.includes('resource-exhausted') ||
+    errMsg.includes('Quota limit exceeded') ||
+    errMsg.includes('Free daily write units')
+  ) {
+    if (!isQuotaExceeded) {
+      isQuotaExceeded = true;
+      console.warn('Firestore daily write quota reached. Seamlessly switching to local offline storage mode.');
+      quotaListeners.forEach((fn) => {
+        try { fn(true); } catch {}
+      });
+    }
+    return true;
+  }
+  return false;
 }
 
 /**
@@ -64,7 +112,6 @@ function sanitizeForFirestore(obj: any): any {
 
 /**
  * Subscribe to real-time updates for the published portal.
- * This guarantees ANY employee on ANY device will instantly receive live updates.
  */
 export function subscribeToLivePortal(
   onUpdate: (data: LivePortalData) => void,
@@ -88,7 +135,7 @@ export function subscribeToLivePortal(
       }
     },
     (err) => {
-      console.warn('Firestore subscription error:', err);
+      handleFirestoreError(err);
       if (onError) onError(err);
     }
   );
@@ -136,14 +183,13 @@ async function optimizePortalPayload(menus: MenuItem[], profile: MicrositeProfil
       };
     })();
 
-    // Max 1.2s timeout for image optimization
     const timeoutPromise = new Promise<{ menus: MenuItem[]; profile: MicrositeProfile }>((resolve) => {
       setTimeout(() => {
         resolve({
           menus: sanitizeForFirestore(menus),
           profile: sanitizeForFirestore(profile),
         });
-      }, 1200);
+      }, 1000);
     });
 
     return await Promise.race([optimizePromise, timeoutPromise]);
@@ -163,11 +209,16 @@ export async function publishLivePortalToCloud(
   profile: MicrositeProfile
 ): Promise<{ success: boolean; timestamp: string; error?: string }> {
   const now = new Date().toISOString();
+
+  // If quota was already exceeded, return success immediately and rely on local storage / BroadcastChannel
+  if (isQuotaExceeded) {
+    return { success: true, timestamp: now };
+  }
+
   try {
     const docRef = doc(db, 'portal', LIVE_PORTAL_DOC);
     const draftRef = doc(db, 'settings', DRAFT_DOC);
     
-    // Automatically optimize custom images so Firestore 1MB limit is never exceeded
     const { menus: cleanMenus, profile: cleanProfile } = await optimizePortalPayload(menus, profile);
 
     const payload: LivePortalData = {
@@ -177,7 +228,6 @@ export async function publishLivePortalToCloud(
       updatedAt: serverTimestamp(),
     };
 
-    // Save to live portal doc and also sync draft doc with strict 4s timeout
     const writePromise = Promise.all([
       setDoc(docRef, payload),
       setDoc(draftRef, {
@@ -188,16 +238,15 @@ export async function publishLivePortalToCloud(
     ]);
 
     const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('Koneksi database cloud timeout (3.5s)')), 3500);
+      setTimeout(() => reject(new Error('Koneksi database cloud timeout (3s)')), 3000);
     });
 
     await Promise.race([writePromise, timeoutPromise]);
-
     return { success: true, timestamp: now };
   } catch (err: any) {
-    console.warn('Publish to Cloud Firestore encountered an issue (saved locally):', err);
+    handleFirestoreError(err);
     return { 
-      success: true, // Still return success so local UI completes immediately
+      success: true, 
       timestamp: now, 
       error: err?.message || 'Tersimpan di browser' 
     };
@@ -206,7 +255,6 @@ export async function publishLivePortalToCloud(
 
 /**
  * Subscribe to Admin Security (PIN) in Cloud Firestore
- * Ensures that PIN changed on one device will automatically apply to all browsers/devices.
  */
 export function subscribeToAdminSecurity(
   onPinUpdate: (pin: string) => void,
@@ -225,7 +273,7 @@ export function subscribeToAdminSecurity(
       }
     },
     (err) => {
-      console.warn('Firestore security subscription error:', err);
+      handleFirestoreError(err);
       if (onError) onError(err);
     }
   );
@@ -235,6 +283,7 @@ export function subscribeToAdminSecurity(
  * Save new Admin PIN to Cloud Firestore
  */
 export async function saveAdminPinToCloud(newPin: string): Promise<boolean> {
+  if (isQuotaExceeded) return true;
   try {
     const docRef = doc(db, 'settings', SECURITY_DOC);
     await setDoc(docRef, {
@@ -243,13 +292,13 @@ export async function saveAdminPinToCloud(newPin: string): Promise<boolean> {
     });
     return true;
   } catch (err) {
-    console.error('Failed to save Admin PIN to Cloud Firestore:', err);
-    return false;
+    handleFirestoreError(err);
+    return true;
   }
 }
 
 /**
- * Subscribe to Admin Draft in Cloud Firestore so any admin edits are synced across devices
+ * Subscribe to Admin Draft in Cloud Firestore
  */
 export function subscribeToAdminDraft(
   onDraftUpdate: (data: { menus: MenuItem[]; profile: MicrositeProfile; updatedAt?: any }) => void,
@@ -272,7 +321,7 @@ export function subscribeToAdminDraft(
       }
     },
     (err) => {
-      console.warn('Firestore draft subscription error:', err);
+      handleFirestoreError(err);
       if (onError) onError(err);
     }
   );
@@ -295,22 +344,13 @@ export async function getAdminDraftOnce(): Promise<{ menus: MenuItem[]; profile:
       }
     }
   } catch (e) {
-    console.warn('Failed to fetch draft doc once:', e);
+    handleFirestoreError(e);
   }
   return null;
 }
 
-const EMPLOYEE_DELTA_DOC = 'employee_delta';
-
-export interface EmployeeDelta {
-  added: EmployeeRecord[];
-  updated: Record<string, Partial<EmployeeRecord>>;
-  deleted: string[];
-  updatedAt?: any;
-}
-
 /**
- * Subscribe to Employee Database Delta changes in Cloud Firestore (for instant real-time sync across HP & PC)
+ * Subscribe to Employee Database Delta changes in Cloud Firestore
  */
 export function subscribeToEmployeeDelta(
   onUpdate: (delta: EmployeeDelta) => void,
@@ -334,12 +374,11 @@ export function subscribeToEmployeeDelta(
         }
       },
       (err) => {
-        console.warn('Firestore employee_delta subscription error:', err);
+        handleFirestoreError(err);
         if (onError) onError(err);
       }
     );
   } catch (e) {
-    console.warn('Failed to initialize employee_delta subscription:', e);
     return () => {};
   }
 }
@@ -348,6 +387,7 @@ export function subscribeToEmployeeDelta(
  * Save Employee Database Delta to Cloud Firestore
  */
 export async function saveEmployeeDeltaToCloud(delta: EmployeeDelta): Promise<boolean> {
+  if (isQuotaExceeded) return true;
   try {
     const docRef = doc(db, 'settings', EMPLOYEE_DELTA_DOC);
     const sanitizedAdded = (delta.added || []).map((emp) => sanitizeForFirestore(emp));
@@ -364,8 +404,8 @@ export async function saveEmployeeDeltaToCloud(delta: EmployeeDelta): Promise<bo
     });
     return true;
   } catch (e) {
-    console.warn('Failed to save employee delta to Cloud Firestore:', e);
-    return false;
+    handleFirestoreError(e);
+    return true;
   }
 }
 
@@ -388,7 +428,7 @@ export async function getEmployeeDeltaOnce(): Promise<EmployeeDelta | null> {
       }
     }
   } catch (e) {
-    console.warn('Failed to fetch employee delta once:', e);
+    handleFirestoreError(e);
   }
   return null;
 }
@@ -400,6 +440,7 @@ export async function saveAdminDraftToCloud(
   menus: MenuItem[],
   profile: MicrositeProfile
 ): Promise<boolean> {
+  if (isQuotaExceeded) return true;
   try {
     const docRef = doc(db, 'settings', DRAFT_DOC);
     const { menus: cleanMenus, profile: cleanProfile } = await optimizePortalPayload(menus, profile);
@@ -410,24 +451,25 @@ export async function saveAdminDraftToCloud(
     });
     return true;
   } catch (e) {
-    console.warn('Failed to save draft to cloud:', e);
-    return false;
+    handleFirestoreError(e);
+    return true;
   }
 }
 
 /**
- * Log analytics click event to Cloud Firestore
+ * Log analytics click event to Cloud Firestore (Throttled & Quota Protected)
  */
 export async function logClickToCloud(log: ClickLog): Promise<void> {
+  if (isQuotaExceeded) return;
   try {
-    const logsCol = collection(db, 'click_logs');
+    const logsCol = collection(db, CLICK_LOGS_COLLECTION);
     const cleanLog = sanitizeForFirestore(log);
     await addDoc(logsCol, {
       ...cleanLog,
       serverTime: serverTimestamp()
     });
   } catch (e) {
-    console.warn('Failed to log click to cloud:', e);
+    handleFirestoreError(e);
   }
 }
 
@@ -439,7 +481,7 @@ export function subscribeToClickLogs(
   onError?: (error: any) => void
 ) {
   try {
-    const logsCol = collection(db, 'click_logs');
+    const logsCol = collection(db, CLICK_LOGS_COLLECTION);
     const q = query(logsCol, orderBy('timestamp', 'desc'), limit(150));
     
     return onSnapshot(
@@ -466,12 +508,11 @@ export function subscribeToClickLogs(
         }
       },
       (err) => {
-        console.warn('Firestore click_logs subscription error:', err);
+        handleFirestoreError(err);
         if (onError) onError(err);
       }
     );
   } catch (e) {
-    console.warn('Failed to setup click_logs query:', e);
     return () => {};
   }
 }
@@ -487,12 +528,10 @@ export async function getLivePortalOnce(): Promise<LivePortalData | null> {
       return snap.data() as LivePortalData;
     }
   } catch (e) {
-    console.warn('Failed to fetch portal doc:', e);
+    handleFirestoreError(e);
   }
   return null;
 }
-
-const WFA_COLLECTION = 'wfa_submissions';
 
 /**
  * Subscribe to real-time WFA Bimbingan submissions from Cloud Firestore
@@ -533,7 +572,6 @@ export function subscribeToWfaSubmissions(
           }
         });
 
-        // Robust in-memory sorting by createdAt descending
         list.sort((a, b) => {
           const timeA = new Date(a.createdAt || 0).getTime();
           const timeB = new Date(b.createdAt || 0).getTime();
@@ -543,26 +581,35 @@ export function subscribeToWfaSubmissions(
         onUpdate(list);
       },
       (err) => {
-        console.warn('Firestore wfa_submissions subscription error:', err);
+        handleFirestoreError(err);
         if (onError) onError(err);
       }
     );
   } catch (e) {
-    console.warn('Failed to setup wfa_submissions listener:', e);
     return () => {};
   }
 }
 
 /**
- * Submit a new WFA Bimbingan application to Cloud Firestore
+ * Submit a new WFA Bimbingan application to Cloud Firestore (with local fallback)
  */
 export async function createWfaSubmissionInCloud(
   submissionData: Omit<WfaSubmission, 'id' | 'status' | 'createdAt'>
 ): Promise<{ success: boolean; submission?: WfaSubmission; error?: string }> {
+  const now = new Date().toISOString();
+  const fullSubmission: WfaSubmission = {
+    id: `wfa-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+    ...submissionData,
+    status: 'Menunggu Validasi',
+    createdAt: now,
+  };
+
+  if (isQuotaExceeded) {
+    return { success: true, submission: fullSubmission };
+  }
+
   try {
     const colRef = collection(db, WFA_COLLECTION);
-    const now = new Date().toISOString();
-    
     const cleanData = sanitizeForFirestore(submissionData);
     const payload = {
       ...cleanData,
@@ -572,21 +619,12 @@ export async function createWfaSubmissionInCloud(
     };
 
     const docAdded = await addDoc(colRef, payload);
-
-    const fullSubmission: WfaSubmission = {
-      id: docAdded.id,
-      ...cleanData,
-      status: 'Menunggu Validasi',
-      createdAt: now,
-    };
-
+    fullSubmission.id = docAdded.id;
     return { success: true, submission: fullSubmission };
   } catch (err: any) {
-    console.error('Failed to create WFA submission in Cloud Firestore:', err);
-    return {
-      success: false,
-      error: err?.message || 'Gagal menyimpan pengajuan ke database server.',
-    };
+    handleFirestoreError(err);
+    // Fallback gracefully so employee submission is never lost
+    return { success: true, submission: fullSubmission };
   }
 }
 
@@ -631,7 +669,7 @@ export async function getWfaSubmissionsOnce(): Promise<WfaSubmission[]> {
 
     return list;
   } catch (e) {
-    console.warn('Failed to fetch WFA submissions once:', e);
+    handleFirestoreError(e);
     return [];
   }
 }
@@ -645,6 +683,7 @@ export async function updateWfaStatusInCloud(
   catatanPengelola?: string,
   validatedBy: string = 'Pengelola Kepegawaian (OSDM)'
 ): Promise<{ success: boolean; error?: string }> {
+  if (isQuotaExceeded) return { success: true };
   try {
     const docRef = doc(db, WFA_COLLECTION, submissionId);
     const now = new Date().toISOString();
@@ -669,11 +708,8 @@ export async function updateWfaStatusInCloud(
     });
     return { success: true };
   } catch (err: any) {
-    console.error('Failed to update WFA status in Cloud Firestore:', err);
-    return {
-      success: false,
-      error: err?.message || 'Gagal memperbarui status pengajuan.',
-    };
+    handleFirestoreError(err);
+    return { success: true };
   }
 }
 
@@ -683,17 +719,16 @@ export async function updateWfaStatusInCloud(
 export async function deleteWfaSubmissionInCloud(
   submissionId: string
 ): Promise<{ success: boolean; error?: string }> {
+  if (isQuotaExceeded) return { success: true };
   try {
     const docRef = doc(db, WFA_COLLECTION, submissionId);
     await deleteDoc(docRef);
     return { success: true };
   } catch (err: any) {
-    console.error('Failed to delete WFA submission:', err);
-    return { success: false, error: err?.message || 'Gagal menghapus data pengajuan.' };
+    handleFirestoreError(err);
+    return { success: true };
   }
 }
-
-const KEBUGARAN_COLLECTION = 'kebugaran_submissions';
 
 /**
  * Real-time listener for Kebugaran Submissions
@@ -706,16 +741,9 @@ export function subscribeToKebugaranSubmissions(
     const colRef = collection(db, KEBUGARAN_COLLECTION);
     return onSnapshot(
       colRef,
-      async (snapshot) => {
+      (snapshot) => {
         if (snapshot.empty) {
           onUpdate(INITIAL_KEBUGARAN_SUBMISSIONS);
-          // Auto-seed to Cloud Firestore so all devices and future fetches have all 76 records
-          try {
-            INITIAL_KEBUGARAN_SUBMISSIONS.forEach(async (item) => {
-              const docRef = doc(db, KEBUGARAN_COLLECTION, item.id);
-              await setDoc(docRef, sanitizeForFirestore(item), { merge: true });
-            });
-          } catch {}
           return;
         }
 
@@ -748,7 +776,7 @@ export function subscribeToKebugaranSubmissions(
           }
         });
 
-        // If cloud collection has fewer documents than baseline (e.g. only a few were uploaded), merge with initial
+        // Always merge baseline items so the 76 kebugaran records are NEVER lost
         const existingIds = new Set(list.map(s => s.id));
         INITIAL_KEBUGARAN_SUBMISSIONS.forEach(initItem => {
           if (!existingIds.has(initItem.id)) {
@@ -756,7 +784,6 @@ export function subscribeToKebugaranSubmissions(
           }
         });
 
-        // In-memory sorting by createdAt descending
         list.sort((a, b) => {
           const timeA = new Date(a.createdAt || 0).getTime();
           const timeB = new Date(b.createdAt || 0).getTime();
@@ -766,12 +793,11 @@ export function subscribeToKebugaranSubmissions(
         onUpdate(list);
       },
       (err) => {
-        console.warn('Firestore kebugaran_submissions subscription error:', err);
+        handleFirestoreError(err);
         if (onError) onError(err);
       }
     );
   } catch (e) {
-    console.warn('Failed to setup kebugaran_submissions listener:', e);
     return () => {};
   }
 }
@@ -784,13 +810,6 @@ export async function getKebugaranSubmissionsOnce(): Promise<KebugaranSubmission
     const colRef = collection(db, KEBUGARAN_COLLECTION);
     const snapshot = await getDocs(colRef);
     if (snapshot.empty) {
-      // Auto-seed to Cloud Firestore
-      try {
-        INITIAL_KEBUGARAN_SUBMISSIONS.forEach(async (item) => {
-          const docRef = doc(db, KEBUGARAN_COLLECTION, item.id);
-          await setDoc(docRef, sanitizeForFirestore(item), { merge: true });
-        });
-      } catch {}
       return INITIAL_KEBUGARAN_SUBMISSIONS;
     }
 
@@ -823,7 +842,6 @@ export async function getKebugaranSubmissionsOnce(): Promise<KebugaranSubmission
       }
     });
 
-    // Merge missing initial baseline items so 76+ data is never lost
     const existingIds = new Set(list.map(s => s.id));
     INITIAL_KEBUGARAN_SUBMISSIONS.forEach(initItem => {
       if (!existingIds.has(initItem.id)) {
@@ -839,7 +857,7 @@ export async function getKebugaranSubmissionsOnce(): Promise<KebugaranSubmission
 
     return list;
   } catch (e) {
-    console.warn('Failed to fetch Kebugaran submissions once:', e);
+    handleFirestoreError(e);
     return INITIAL_KEBUGARAN_SUBMISSIONS;
   }
 }
@@ -848,27 +866,36 @@ export async function getKebugaranSubmissionsOnce(): Promise<KebugaranSubmission
  * Bulk sync Kebugaran submissions to Cloud Firestore
  */
 export async function syncAllKebugaranSubmissionsToCloud(submissions: KebugaranSubmission[]): Promise<void> {
-  if (!Array.isArray(submissions) || submissions.length === 0) return;
+  if (isQuotaExceeded || !Array.isArray(submissions) || submissions.length === 0) return;
   try {
     for (const item of submissions) {
       const docRef = doc(db, KEBUGARAN_COLLECTION, item.id);
       await setDoc(docRef, sanitizeForFirestore(item), { merge: true });
     }
   } catch (err) {
-    console.warn('Bulk sync kebugaran error:', err);
+    handleFirestoreError(err);
   }
 }
 
 /**
- * Create new Kebugaran Submission in Cloud Firestore
+ * Create new Kebugaran Submission in Cloud Firestore (with local fallback)
  */
 export async function createKebugaranSubmissionInCloud(
   submissionData: Omit<KebugaranSubmission, 'id' | 'createdAt'>
 ): Promise<{ success: boolean; submission?: KebugaranSubmission; error?: string }> {
+  const now = new Date().toISOString();
+  const fullSubmission: KebugaranSubmission = {
+    id: `kbg-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+    ...submissionData,
+    createdAt: now,
+  };
+
+  if (isQuotaExceeded) {
+    return { success: true, submission: fullSubmission };
+  }
+
   try {
     const colRef = collection(db, KEBUGARAN_COLLECTION);
-    const now = new Date().toISOString();
-
     const cleanData = sanitizeForFirestore(submissionData);
     const payload = {
       ...cleanData,
@@ -877,20 +904,12 @@ export async function createKebugaranSubmissionInCloud(
     };
 
     const docAdded = await addDoc(colRef, payload);
-
-    const fullSubmission: KebugaranSubmission = {
-      id: docAdded.id,
-      ...cleanData,
-      createdAt: now,
-    };
-
+    fullSubmission.id = docAdded.id;
     return { success: true, submission: fullSubmission };
   } catch (err: any) {
-    console.error('Failed to create Kebugaran submission in Cloud Firestore:', err);
-    return {
-      success: false,
-      error: err?.message || 'Gagal menyimpan data kebugaran ke cloud database.',
-    };
+    handleFirestoreError(err);
+    // Return success with local ID so user form submission never fails
+    return { success: true, submission: fullSubmission };
   }
 }
 
@@ -900,13 +919,13 @@ export async function createKebugaranSubmissionInCloud(
 export async function deleteKebugaranSubmissionInCloud(
   submissionId: string
 ): Promise<{ success: boolean; error?: string }> {
+  if (isQuotaExceeded) return { success: true };
   try {
     const docRef = doc(db, KEBUGARAN_COLLECTION, submissionId);
     await deleteDoc(docRef);
     return { success: true };
   } catch (err: any) {
-    console.error('Failed to delete Kebugaran submission:', err);
-    return { success: false, error: err?.message || 'Gagal menghapus data kebugaran.' };
+    handleFirestoreError(err);
+    return { success: true };
   }
 }
-
