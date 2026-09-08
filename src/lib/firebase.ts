@@ -430,7 +430,14 @@ export async function createWfaSubmissionInCloud(
       serverTimestamp: serverTimestamp(),
     });
 
-    const docAdded = await addDoc(colRef, payload);
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Cloud sync timeout (offline or slow connection)')), 4000)
+    );
+
+    const docAdded = (await Promise.race([
+      addDoc(colRef, payload),
+      timeoutPromise,
+    ])) as any;
 
     const fullSubmission: WfaSubmission = {
       id: docAdded.id,
@@ -603,7 +610,14 @@ export async function createKebugaranSubmissionInCloud(
       serverTimestamp: serverTimestamp(),
     });
 
-    const docAdded = await addDoc(colRef, payload);
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Cloud sync timeout (offline or slow connection)')), 4000)
+    );
+
+    const docAdded = (await Promise.race([
+      addDoc(colRef, payload),
+      timeoutPromise,
+    ])) as any;
 
     const fullSubmission: KebugaranSubmission = {
       id: docAdded.id,
