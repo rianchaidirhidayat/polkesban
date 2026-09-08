@@ -42,7 +42,7 @@ const LOCAL_STORAGE_LOGS_KEY = 'direct_menu_logs_v2';
 const LOCAL_STORAGE_ADMIN_PIN_KEY = 'direct_menu_admin_pin_v2';
 const SESSION_ADMIN_AUTH_KEY = 'direct_menu_admin_auth_v2';
 const LOCAL_STORAGE_WFA_SUBMISSIONS_KEY = 'direct_menu_wfa_submissions_v1';
-const LOCAL_STORAGE_KEBUGARAN_SUBMISSIONS_KEY = 'direct_menu_kebugaran_submissions_v1';
+const LOCAL_STORAGE_KEBUGARAN_SUBMISSIONS_KEY = 'direct_menu_kebugaran_submissions_v3';
 
 // Live published storage keys (what employees see on public page)
 const LOCAL_STORAGE_LIVE_MENUS_KEY = 'direct_menu_live_items_v2';
