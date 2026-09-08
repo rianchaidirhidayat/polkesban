@@ -64,11 +64,36 @@ export interface EmployeeDelta {
 }
 
 // Global Circuit Breaker for Firestore Free Tier Quota Limit
-let isQuotaExceeded = false;
+const QUOTA_STORAGE_KEY = 'direct_menu_firestore_quota_exceeded_v1';
+
+let isQuotaExceeded: boolean = (() => {
+  try {
+    const saved = localStorage.getItem(QUOTA_STORAGE_KEY);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      // Valid for 4 hours
+      if (parsed.timestamp && Date.now() - parsed.timestamp < 4 * 60 * 60 * 1000) {
+        return true;
+      }
+    }
+  } catch {}
+  return false;
+})();
+
 const quotaListeners: Array<(exceeded: boolean) => void> = [];
 
 export function getIsQuotaExceeded(): boolean {
   return isQuotaExceeded;
+}
+
+export function resetQuotaCircuitBreaker(): void {
+  isQuotaExceeded = false;
+  try {
+    localStorage.removeItem(QUOTA_STORAGE_KEY);
+  } catch {}
+  quotaListeners.forEach((fn) => {
+    try { fn(false); } catch {}
+  });
 }
 
 export function subscribeToQuotaExceeded(listener: (exceeded: boolean) => void): () => void {
@@ -91,6 +116,12 @@ function handleFirestoreError(err: any): boolean {
   ) {
     if (!isQuotaExceeded) {
       isQuotaExceeded = true;
+      try {
+        localStorage.setItem(QUOTA_STORAGE_KEY, JSON.stringify({
+          exceeded: true,
+          timestamp: Date.now()
+        }));
+      } catch {}
       console.warn('Firestore daily write quota reached. Seamlessly switching to local offline storage mode.');
       quotaListeners.forEach((fn) => {
         try { fn(true); } catch {}

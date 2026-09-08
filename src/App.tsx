@@ -137,6 +137,14 @@ export default function App() {
     return 'admin123';
   });
 
+  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState<boolean>(() => {
+    try {
+      return sessionStorage.getItem(SESSION_ADMIN_AUTH_KEY) === 'true';
+    } catch {
+      return false;
+    }
+  });
+
   // WFA Bimbingan Submissions state
   const [wfaSubmissions, setWfaSubmissions] = useState<WfaSubmission[]>(() => {
     try {
@@ -196,16 +204,6 @@ export default function App() {
       },
       (err) => {
         console.warn('Firestore subscription status:', err);
-      },
-      async () => {
-        // Cloud document doesn't exist yet on Firestore!
-        // Seed initial portal live data to Cloud Firestore once
-        try {
-          await publishLivePortalToCloud(menus, profile);
-          setIsCloudSynced(true);
-        } catch (e) {
-          console.warn('Firestore auto-seed error:', e);
-        }
       }
     );
 
@@ -343,19 +341,19 @@ export default function App() {
     });
   }, []);
 
-  // Save admin working draft changes (when admin is logged in) with 5s debounce
+  // Save admin working draft changes (only when admin is actively logged in) with 5s debounce
   const isFirstMountForDraftSync = useRef(true);
   useEffect(() => {
     if (isFirstMountForDraftSync.current) {
       isFirstMountForDraftSync.current = false;
       return;
     }
-    if (isQuotaLimited) return;
+    if (!isAdminAuthenticated || isQuotaLimited) return;
     const timer = setTimeout(() => {
       saveAdminDraftToCloud(menus, profile).catch(() => {});
     }, 5000);
     return () => clearTimeout(timer);
-  }, [menus, profile, isQuotaLimited]);
+  }, [menus, profile, isAdminAuthenticated, isQuotaLimited]);
 
   // Real-time Cloud Listener for WFA Submissions
   useEffect(() => {
@@ -545,14 +543,6 @@ export default function App() {
       unsubscribe();
     };
   }, []);
-
-  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState<boolean>(() => {
-    try {
-      return sessionStorage.getItem(SESSION_ADMIN_AUTH_KEY) === 'true';
-    } catch {
-      return false;
-    }
-  });
 
   const [currentView, setCurrentView] = useState<'public' | 'admin' | 'split'>(() => {
     try {
