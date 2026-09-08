@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { motion } from 'motion/react';
 import confetti from 'canvas-confetti';
 import { MenuItem, MicrositeProfile, ThemeConfig } from '../types';
@@ -169,6 +169,38 @@ export const PublicMicrosite: React.FC<PublicMicrositeProps> = ({
       window.open(verifiedMenu.url, verifiedMenu.openInNewTab ? '_blank' : '_self', 'noopener,noreferrer');
     }
   };
+
+  // Deep linking: auto-open form if URL contains #input-kebugaran, #wfa-bimbingan or ?form=...
+  useEffect(() => {
+    const handleCheckHash = () => {
+      const hash = window.location.hash;
+      const search = new URLSearchParams(window.location.search);
+      const formParam = search.get('form');
+
+      if (hash === '#input-kebugaran' || formParam === 'kebugaran') {
+        const kbgMenu = menus.find((m) => isKebugaranMenu(m));
+        if (kbgMenu) {
+          handleButtonClick(kbgMenu);
+        } else {
+          setIsKebugaranModalOpen(true);
+        }
+      } else if (hash === '#wfa-bimbingan' || formParam === 'wfa') {
+        const wfaMenu = menus.find((m) => isWfaMenu(m));
+        if (wfaMenu) {
+          handleButtonClick(wfaMenu);
+        } else {
+          setIsWfaModalOpen(true);
+        }
+      }
+    };
+
+    // Check on mount
+    handleCheckHash();
+
+    // Listen to hash change
+    window.addEventListener('hashchange', handleCheckHash);
+    return () => window.removeEventListener('hashchange', handleCheckHash);
+  }, [menus]);
 
   // Get background styles
   const getPageBackgroundStyle = (): React.CSSProperties => {
@@ -590,7 +622,14 @@ export const PublicMicrosite: React.FC<PublicMicrositeProps> = ({
       {/* Floating Modal: Formulir Pengajuan WFA Bimbingan & Pengecekan Status */}
       <WfaBimbinganModal
         isOpen={isWfaModalOpen}
-        onClose={() => setIsWfaModalOpen(false)}
+        onClose={() => {
+          setIsWfaModalOpen(false);
+          if (window.location.hash === '#wfa-bimbingan') {
+            try {
+              history.replaceState(null, '', window.location.pathname + window.location.search);
+            } catch {}
+          }
+        }}
         onSubmit={onSubmitWfa || (async () => ({ success: true }))}
         allSubmissions={wfaSubmissions}
         logoUrl={profile.avatarUrl}
@@ -600,7 +639,14 @@ export const PublicMicrosite: React.FC<PublicMicrositeProps> = ({
       {/* Floating Modal: Formulir Input Data Kebugaran Pegawai */}
       <KebugaranModal
         isOpen={isKebugaranModalOpen}
-        onClose={() => setIsKebugaranModalOpen(false)}
+        onClose={() => {
+          setIsKebugaranModalOpen(false);
+          if (window.location.hash === '#input-kebugaran') {
+            try {
+              history.replaceState(null, '', window.location.pathname + window.location.search);
+            } catch {}
+          }
+        }}
         onSubmit={onSubmitKebugaran || (async () => ({ success: true }))}
         allSubmissions={kebugaranSubmissions}
         logoUrl={profile.avatarUrl}

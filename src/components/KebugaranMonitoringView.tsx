@@ -20,7 +20,9 @@ import {
   Sparkles,
   Lock,
   ArrowUpDown,
-  Download
+  Download,
+  Link2,
+  Check
 } from 'lucide-react';
 import { KebugaranSubmission, KebugaranPeriode, EmployeeRecord, MenuItem } from '../types';
 import { getActiveEmployees, getPoltekkesUnitKerjaList } from '../data/employeeDatabase';
@@ -69,6 +71,19 @@ export const KebugaranMonitoringView: React.FC<KebugaranMonitoringViewProps> = (
   const [menuPinCode, setMenuPinCode] = useState(kebugaranMenu?.pinCode || '');
   const [isPinProtected, setIsPinProtected] = useState(kebugaranMenu?.isProtected || false);
   const [pinSavedFeedback, setPinSavedFeedback] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
+
+  const handleCopyFormLink = () => {
+    const url = `${window.location.origin}${window.location.pathname}#input-kebugaran`;
+    try {
+      navigator.clipboard.writeText(url);
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 2000);
+    } catch {
+      // fallback prompt
+      prompt('Salin link formulir kebugaran:', url);
+    }
+  };
 
   // Master employees list
   const allMasterEmployees = useMemo(() => getActiveEmployees(), []);
@@ -222,6 +237,20 @@ export const KebugaranMonitoringView: React.FC<KebugaranMonitoringViewProps> = (
               <span className="hidden sm:inline">Refresh</span>
             </button>
           )}
+
+          {/* Salin Tautan Formulir Kebugaran */}
+          <button
+            onClick={handleCopyFormLink}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-bold transition-all shadow-xs ${
+              copiedLink
+                ? 'bg-emerald-50 border-emerald-300 text-emerald-700'
+                : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-700'
+            }`}
+            title="Salin Tautan Langsung Formulir Kebugaran (#input-kebugaran)"
+          >
+            {copiedLink ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Link2 className="w-3.5 h-3.5 text-blue-600" />}
+            <span>{copiedLink ? 'Link Tersalin!' : 'Salin Link Form'}</span>
+          </button>
 
           {/* Atur PIN Tombol Menu */}
           <button
