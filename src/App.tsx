@@ -141,19 +141,32 @@ export default function App() {
     return INITIAL_WFA_SUBMISSIONS;
   });
 
-  // Kebugaran Jasmani Submissions state (Reset Triwulan I, II, IV; only Triwulan III)
+  // Kebugaran Jasmani Submissions state (76 records from CSV + Cloud synchronization)
   const [kebugaranSubmissions, setKebugaranSubmissions] = useState<KebugaranSubmission[]>(() => {
     try {
+      let deletedIds: string[] = [];
+      const deletedStored = localStorage.getItem('direct_menu_kebugaran_deleted_ids');
+      if (deletedStored) deletedIds = JSON.parse(deletedStored);
+
+      const map = new Map<string, KebugaranSubmission>();
+      INITIAL_KEBUGARAN_SUBMISSIONS.forEach((item) => {
+        if (!deletedIds.includes(item.id)) {
+          map.set(item.id, item);
+        }
+      });
+
       const saved = localStorage.getItem(LOCAL_STORAGE_KEBUGARAN_SUBMISSIONS_KEY);
       if (saved) {
         const parsed: KebugaranSubmission[] = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          const onlyTriwulan3 = parsed.filter((item) => item.periode === 'Triwulan III');
-          if (onlyTriwulan3.length > 0) {
-            return onlyTriwulan3;
-          }
+          parsed.forEach((item) => {
+            if (!deletedIds.includes(item.id)) {
+              map.set(item.id, item);
+            }
+          });
         }
       }
+      return Array.from(map.values());
     } catch {
       // ignore
     }
@@ -709,6 +722,16 @@ export default function App() {
   };
 
   const handleDeleteKebugaranSubmission = async (id: string) => {
+    // Record deleted ID
+    try {
+      const stored = localStorage.getItem('direct_menu_kebugaran_deleted_ids');
+      const deletedIds: string[] = stored ? JSON.parse(stored) : [];
+      if (!deletedIds.includes(id)) {
+        deletedIds.push(id);
+        localStorage.setItem('direct_menu_kebugaran_deleted_ids', JSON.stringify(deletedIds));
+      }
+    } catch {}
+
     // 1. Optimistic local delete
     setKebugaranSubmissions((prev) => {
       const filtered = prev.filter((s) => s.id !== id);
@@ -1087,6 +1110,12 @@ export default function App() {
             onDeleteWfaSubmission={handleDeleteWfaSubmission}
             kebugaranSubmissions={kebugaranSubmissions}
             onDeleteKebugaranSubmission={handleDeleteKebugaranSubmission}
+            onRefreshKebugaran={() => {
+              try {
+                localStorage.removeItem('direct_menu_kebugaran_deleted_ids');
+              } catch {}
+              setKebugaranSubmissions(INITIAL_KEBUGARAN_SUBMISSIONS);
+            }}
             onOpenKebugaranModal={() => setIsAdminKebugaranModalOpen(true)}
           />
         )}
@@ -1120,6 +1149,12 @@ export default function App() {
                 onDeleteWfaSubmission={handleDeleteWfaSubmission}
                 kebugaranSubmissions={kebugaranSubmissions}
                 onDeleteKebugaranSubmission={handleDeleteKebugaranSubmission}
+                onRefreshKebugaran={() => {
+                  try {
+                    localStorage.removeItem('direct_menu_kebugaran_deleted_ids');
+                  } catch {}
+                  setKebugaranSubmissions(INITIAL_KEBUGARAN_SUBMISSIONS);
+                }}
                 onOpenKebugaranModal={() => setIsAdminKebugaranModalOpen(true)}
               />
             </div>
