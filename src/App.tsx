@@ -14,6 +14,7 @@ import { CheckCheck, Sparkles, Send, Cloud, CloudCheck, Wifi, RefreshCw } from '
 import { 
   subscribeToLivePortal, 
   publishLivePortalToCloud, 
+  getLivePortalOnce,
   logClickToCloud,
   subscribeToAdminSecurity,
   saveAdminPinToCloud,
@@ -166,10 +167,19 @@ export default function App() {
           const syncedMenus = ensureHasWfaMenu(cloudData.menus);
           setLiveMenus(syncedMenus);
           setLiveProfile(cloudData.profile);
+          setMenus(syncedMenus);
+          setProfile(cloudData.profile);
           if (cloudData.lastPublishedAt) {
             setLastPublishedAt(cloudData.lastPublishedAt);
           }
           setIsCloudSynced(true);
+
+          try {
+            localStorage.setItem(LOCAL_STORAGE_LIVE_MENUS_KEY, JSON.stringify(syncedMenus));
+            localStorage.setItem(LOCAL_STORAGE_LIVE_PROFILE_KEY, JSON.stringify(cloudData.profile));
+            localStorage.setItem(LOCAL_STORAGE_MENUS_KEY, JSON.stringify(syncedMenus));
+            localStorage.setItem(LOCAL_STORAGE_PROFILE_KEY, JSON.stringify(cloudData.profile));
+          } catch {}
 
           // If cloud data was missing the WFA menu, auto-update the live portal in Cloud Firestore
           const hadWfa = cloudData.menus.some(
@@ -180,14 +190,6 @@ export default function App() {
           );
           if (!hadWfa) {
             publishLivePortalToCloud(syncedMenus, cloudData.profile).catch(console.warn);
-          }
-
-          // Only seed draft from cloud if the user has NO local draft saved yet
-          const hasLocalDraft = !!localStorage.getItem(LOCAL_STORAGE_MENUS_KEY);
-          if (!isInitialDraftLoadedFromCloudRef.current && !hasLocalDraft) {
-            setMenus(syncedMenus);
-            setProfile(cloudData.profile);
-            isInitialDraftLoadedFromCloudRef.current = true;
           }
         }
       },
@@ -216,10 +218,13 @@ export default function App() {
           if (event.data?.type === 'PORTAL_LIVE_UPDATE') {
             const { menus: pubMenus, profile: pubProfile, timestamp } = event.data;
             if (pubMenus && Array.isArray(pubMenus)) {
-              setLiveMenus(ensureHasWfaMenu(pubMenus));
+              const sMenus = ensureHasWfaMenu(pubMenus);
+              setLiveMenus(sMenus);
+              setMenus(sMenus);
             }
             if (pubProfile) {
               setLiveProfile(pubProfile);
+              setProfile(pubProfile);
             }
             if (timestamp) {
               setLastPublishedAt(timestamp);
@@ -236,12 +241,16 @@ export default function App() {
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === LOCAL_STORAGE_LIVE_MENUS_KEY && e.newValue) {
         try {
-          setLiveMenus(ensureHasWfaMenu(JSON.parse(e.newValue)));
+          const m = ensureHasWfaMenu(JSON.parse(e.newValue));
+          setLiveMenus(m);
+          setMenus(m);
         } catch {}
       }
       if (e.key === LOCAL_STORAGE_LIVE_PROFILE_KEY && e.newValue) {
         try {
-          setLiveProfile(JSON.parse(e.newValue));
+          const p = JSON.parse(e.newValue);
+          setLiveProfile(p);
+          setProfile(p);
         } catch {}
       }
       if (e.key === LOCAL_STORAGE_LAST_PUBLISHED_KEY && e.newValue) {
@@ -299,8 +308,10 @@ export default function App() {
 
         if (draftMenusStr !== currMenusStr) {
           setMenus(syncedDraftMenus);
+          setLiveMenus(syncedDraftMenus);
           try {
             localStorage.setItem(LOCAL_STORAGE_MENUS_KEY, draftMenusStr);
+            localStorage.setItem(LOCAL_STORAGE_LIVE_MENUS_KEY, draftMenusStr);
           } catch {}
         }
 
@@ -308,8 +319,10 @@ export default function App() {
         const currProfStr = JSON.stringify(profileRef.current);
         if (draftProfStr !== currProfStr) {
           setProfile(draftData.profile);
+          setLiveProfile(draftData.profile);
           try {
             localStorage.setItem(LOCAL_STORAGE_PROFILE_KEY, draftProfStr);
+            localStorage.setItem(LOCAL_STORAGE_LIVE_PROFILE_KEY, draftProfStr);
           } catch {}
         }
 
@@ -322,16 +335,18 @@ export default function App() {
     };
   }, []);
 
-  // Debounced auto-save draft to Cloud Firestore so both PC and Handphone stay synchronized
+  // Debounced auto-sync to Cloud Firestore so all devices always stay synchronized in real time
   const isFirstMountForDraftSync = useRef(true);
   useEffect(() => {
     if (isFirstMountForDraftSync.current) {
       isFirstMountForDraftSync.current = false;
+      // Publish current configuration on initial mount so cloud database is always up-to-date
+      publishLivePortalToCloud(menus, profile).catch(() => {});
       return;
     }
     const timer = setTimeout(() => {
-      saveAdminDraftToCloud(menus, profile).catch(() => {});
-    }, 1500);
+      publishLivePortalToCloud(menus, profile).catch(() => {});
+    }, 1200);
     return () => clearTimeout(timer);
   }, [menus, profile]);
 
@@ -342,15 +357,21 @@ export default function App() {
   const handleForceSyncFromCloud = async () => {
     setIsForceSyncing(true);
     try {
-      // 1. Fetch latest draft from Firestore
+      // 1. Fetch latest live portal & draft from Firestore
+      const liveData = await getLivePortalOnce();
       const draft = await getAdminDraftOnce();
-      if (draft && Array.isArray(draft.menus) && draft.profile) {
-        const synced = ensureHasWfaMenu(draft.menus);
+      const chosen = liveData || draft;
+      if (chosen && Array.isArray(chosen.menus) && chosen.profile) {
+        const synced = ensureHasWfaMenu(chosen.menus);
         setMenus(synced);
-        setProfile(draft.profile);
+        setProfile(chosen.profile);
+        setLiveMenus(synced);
+        setLiveProfile(chosen.profile);
         try {
           localStorage.setItem(LOCAL_STORAGE_MENUS_KEY, JSON.stringify(synced));
-          localStorage.setItem(LOCAL_STORAGE_PROFILE_KEY, JSON.stringify(draft.profile));
+          localStorage.setItem(LOCAL_STORAGE_PROFILE_KEY, JSON.stringify(chosen.profile));
+          localStorage.setItem(LOCAL_STORAGE_LIVE_MENUS_KEY, JSON.stringify(synced));
+          localStorage.setItem(LOCAL_STORAGE_LIVE_PROFILE_KEY, JSON.stringify(chosen.profile));
         } catch {}
       }
 
