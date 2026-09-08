@@ -12,7 +12,8 @@ import { KebugaranModal } from './components/KebugaranModal';
 import { motion, AnimatePresence } from 'motion/react';
 import { CheckCheck, Sparkles, Send, Cloud, CloudCheck, Wifi } from 'lucide-react';
 import { 
-  subscribeToLivePortal, 
+  subscribeToLivePortal,
+  getLivePortalOnce, 
   publishLivePortalToCloud, 
   logClickToCloud,
   subscribeToAdminSecurity,
@@ -941,6 +942,33 @@ export default function App() {
     }
   };
 
+  // Force Pull/Sync directly from Cloud Firestore
+  const handleForceSyncFromCloud = async () => {
+    try {
+      const cloudData = await getLivePortalOnce();
+      if (cloudData && Array.isArray(cloudData.menus) && cloudData.profile) {
+        const syncedMenus = ensureHasWfaMenu(cloudData.menus);
+        setLiveMenus(syncedMenus);
+        setLiveProfile(cloudData.profile);
+        setMenus(syncedMenus);
+        setProfile(cloudData.profile);
+        if (cloudData.lastPublishedAt) setLastPublishedAt(cloudData.lastPublishedAt);
+        setIsCloudSynced(true);
+        try {
+          localStorage.setItem(LOCAL_STORAGE_LIVE_MENUS_KEY, JSON.stringify(syncedMenus));
+          localStorage.setItem(LOCAL_STORAGE_LIVE_PROFILE_KEY, JSON.stringify(cloudData.profile));
+          localStorage.setItem(LOCAL_STORAGE_MENUS_KEY, JSON.stringify(syncedMenus));
+          localStorage.setItem(LOCAL_STORAGE_PROFILE_KEY, JSON.stringify(cloudData.profile));
+        } catch {}
+        return { success: true };
+      }
+      return { success: false, error: 'Data di Cloud Firestore masih kosong' };
+    } catch (err: any) {
+      console.warn('Force sync from cloud error:', err);
+      return { success: false, error: err?.message || 'Gagal terhubung ke Cloud Firestore' };
+    }
+  };
+
   // Click tracking event dispatcher
   const handleMenuClick = (clickedMenu: MenuItem) => {
     // 1. Increment menu click count in both draft and live
@@ -1076,6 +1104,7 @@ export default function App() {
               }}
               isStandalone={true}
               lastPublishedAt={lastPublishedAt}
+              onRefresh={handleForceSyncFromCloud}
               wfaSubmissions={wfaSubmissions}
               onSubmitWfa={handleCreateWfaSubmission}
               kebugaranSubmissions={kebugaranSubmissions}
@@ -1105,6 +1134,7 @@ export default function App() {
             onPublish={handlePublishLive}
             isPublishing={isPublishing}
             lastPublishedAt={lastPublishedAt}
+            onPullFromCloud={handleForceSyncFromCloud}
             wfaSubmissions={wfaSubmissions}
             onUpdateWfaStatus={handleUpdateWfaStatus}
             onDeleteWfaSubmission={handleDeleteWfaSubmission}
@@ -1144,6 +1174,7 @@ export default function App() {
                 onPublish={handlePublishLive}
                 isPublishing={isPublishing}
                 lastPublishedAt={lastPublishedAt}
+                onPullFromCloud={handleForceSyncFromCloud}
                 wfaSubmissions={wfaSubmissions}
                 onUpdateWfaStatus={handleUpdateWfaStatus}
                 onDeleteWfaSubmission={handleDeleteWfaSubmission}

@@ -95,6 +95,23 @@ export function subscribeToLivePortal(
 }
 
 /**
+ * Fetch the live published portal data once from Cloud Firestore
+ */
+export async function getLivePortalOnce(): Promise<LivePortalData | null> {
+  try {
+    const docRef = doc(db, 'portal', LIVE_PORTAL_DOC);
+    const snap = await getDoc(docRef);
+    if (snap.exists()) {
+      return snap.data() as LivePortalData;
+    }
+    return null;
+  } catch (err) {
+    console.warn('Failed to fetch live portal once:', err);
+    return null;
+  }
+}
+
+/**
  * Helper to downscale and optimize heavy base64 images inside menus and profile
  */
 async function optimizePortalPayload(menus: MenuItem[], profile: MicrositeProfile) {
@@ -333,21 +350,7 @@ export function subscribeToClickLogs(
   }
 }
 
-/**
- * Load initial portal state once
- */
-export async function getLivePortalOnce(): Promise<LivePortalData | null> {
-  try {
-    const docRef = doc(db, 'portal', LIVE_PORTAL_DOC);
-    const snap = await getDoc(docRef);
-    if (snap.exists()) {
-      return snap.data() as LivePortalData;
-    }
-  } catch (e) {
-    console.warn('Failed to fetch portal doc:', e);
-  }
-  return null;
-}
+
 
 const WFA_COLLECTION = 'wfa_submissions';
 
