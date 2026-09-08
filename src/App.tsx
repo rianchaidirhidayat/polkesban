@@ -6,34 +6,27 @@ import { QRCodeModal } from './components/QRCodeModal';
 import { AdminAuthModal } from './components/AdminAuthModal';
 import { MenuItem, MicrositeProfile, ClickLog, WfaSubmission, WfaValidationStatus, KebugaranSubmission } from './types';
 import { INITIAL_MENUS, INITIAL_PROFILE, INITIAL_CLICK_LOGS, ensureHasWfaMenu } from './data/initialData';
-import { INITIAL_WFA_SUBMISSIONS, applyCloudEmployeeDelta } from './data/employeeDatabase';
+import { INITIAL_WFA_SUBMISSIONS } from './data/employeeDatabase';
 import { INITIAL_KEBUGARAN_SUBMISSIONS } from './data/kebugaranInitialData';
 import { KebugaranModal } from './components/KebugaranModal';
 import { motion, AnimatePresence } from 'motion/react';
-import { CheckCheck, Sparkles, Send, Cloud, CloudCheck, Wifi, RefreshCw } from 'lucide-react';
+import { CheckCheck, Sparkles, Send, Cloud, CloudCheck, Wifi } from 'lucide-react';
 import { 
   subscribeToLivePortal, 
   publishLivePortalToCloud, 
-  getLivePortalOnce,
   logClickToCloud,
   subscribeToAdminSecurity,
   saveAdminPinToCloud,
   subscribeToAdminDraft,
   saveAdminDraftToCloud,
-  getAdminDraftOnce,
-  getEmployeeDeltaOnce,
   subscribeToClickLogs,
   subscribeToWfaSubmissions,
-  getWfaSubmissionsOnce,
   createWfaSubmissionInCloud,
   updateWfaStatusInCloud,
   deleteWfaSubmissionInCloud,
   subscribeToKebugaranSubmissions,
-  getKebugaranSubmissionsOnce,
   createKebugaranSubmissionInCloud,
-  deleteKebugaranSubmissionInCloud,
-  subscribeToQuotaExceeded,
-  getIsQuotaExceeded
+  deleteKebugaranSubmissionInCloud
 } from './lib/firebase';
 
 const LOCAL_STORAGE_MENUS_KEY = 'direct_menu_items_v2';
@@ -42,7 +35,7 @@ const LOCAL_STORAGE_LOGS_KEY = 'direct_menu_logs_v2';
 const LOCAL_STORAGE_ADMIN_PIN_KEY = 'direct_menu_admin_pin_v2';
 const SESSION_ADMIN_AUTH_KEY = 'direct_menu_admin_auth_v2';
 const LOCAL_STORAGE_WFA_SUBMISSIONS_KEY = 'direct_menu_wfa_submissions_v1';
-const LOCAL_STORAGE_KEBUGARAN_SUBMISSIONS_KEY = 'direct_menu_kebugaran_submissions_v3';
+const LOCAL_STORAGE_KEBUGARAN_SUBMISSIONS_KEY = 'direct_menu_kebugaran_submissions_v1';
 
 // Live published storage keys (what employees see on public page)
 const LOCAL_STORAGE_LIVE_MENUS_KEY = 'direct_menu_live_items_v2';
@@ -137,14 +130,6 @@ export default function App() {
     return 'admin123';
   });
 
-  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState<boolean>(() => {
-    try {
-      return sessionStorage.getItem(SESSION_ADMIN_AUTH_KEY) === 'true';
-    } catch {
-      return false;
-    }
-  });
-
   // WFA Bimbingan Submissions state
   const [wfaSubmissions, setWfaSubmissions] = useState<WfaSubmission[]>(() => {
     try {
@@ -156,21 +141,11 @@ export default function App() {
     return INITIAL_WFA_SUBMISSIONS;
   });
 
-  // Kebugaran Jasmani Submissions state (Guaranteed 76+ records)
+  // Kebugaran Jasmani Submissions state
   const [kebugaranSubmissions, setKebugaranSubmissions] = useState<KebugaranSubmission[]>(() => {
     try {
       const saved = localStorage.getItem(LOCAL_STORAGE_KEBUGARAN_SUBMISSIONS_KEY);
-      if (saved) {
-        const parsed: KebugaranSubmission[] = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length >= INITIAL_KEBUGARAN_SUBMISSIONS.length) {
-          return parsed;
-        } else if (Array.isArray(parsed) && parsed.length > 0) {
-          const map = new Map<string, KebugaranSubmission>();
-          INITIAL_KEBUGARAN_SUBMISSIONS.forEach(item => map.set(item.id, item));
-          parsed.forEach(item => map.set(item.id, item));
-          return Array.from(map.values());
-        }
-      }
+      if (saved) return JSON.parse(saved);
     } catch {
       // ignore
     }
@@ -187,23 +162,44 @@ export default function App() {
           const syncedMenus = ensureHasWfaMenu(cloudData.menus);
           setLiveMenus(syncedMenus);
           setLiveProfile(cloudData.profile);
-          setMenus(syncedMenus);
-          setProfile(cloudData.profile);
           if (cloudData.lastPublishedAt) {
             setLastPublishedAt(cloudData.lastPublishedAt);
           }
           setIsCloudSynced(true);
 
-          try {
-            localStorage.setItem(LOCAL_STORAGE_LIVE_MENUS_KEY, JSON.stringify(syncedMenus));
-            localStorage.setItem(LOCAL_STORAGE_LIVE_PROFILE_KEY, JSON.stringify(cloudData.profile));
-            localStorage.setItem(LOCAL_STORAGE_MENUS_KEY, JSON.stringify(syncedMenus));
-            localStorage.setItem(LOCAL_STORAGE_PROFILE_KEY, JSON.stringify(cloudData.profile));
-          } catch {}
+          // If cloud data was missing the WFA menu, auto-update the live portal in Cloud Firestore
+          const hadWfa = cloudData.menus.some(
+            (m: MenuItem) =>
+              m.id === 'menu-wfa-bimbingan' ||
+              m.url === '#wfa-bimbingan' ||
+              m.title?.toLowerCase().includes('wfa bimbingan')
+          );
+          if (!hadWfa) {
+            publishLivePortalToCloud(syncedMenus, cloudData.profile).catch(console.warn);
+          }
+
+          // Only seed draft from cloud if the user has NO local draft saved yet
+          const hasLocalDraft = !!localStorage.getItem(LOCAL_STORAGE_MENUS_KEY);
+          if (!isInitialDraftLoadedFromCloudRef.current && !hasLocalDraft) {
+            setMenus(syncedMenus);
+            setProfile(cloudData.profile);
+            isInitialDraftLoadedFromCloudRef.current = true;
+          }
         }
       },
       (err) => {
         console.warn('Firestore subscription status:', err);
+      },
+      async () => {
+        // Cloud document doesn't exist yet on Firestore!
+        // Automatically seed with current menus and profile so any employee opening the link sees it immediately.
+        try {
+          console.log('Seeding initial portal live data to Cloud Firestore...');
+          await publishLivePortalToCloud(menus, profile);
+          setIsCloudSynced(true);
+        } catch (e) {
+          console.warn('Firestore auto-seed error:', e);
+        }
       }
     );
 
@@ -216,13 +212,10 @@ export default function App() {
           if (event.data?.type === 'PORTAL_LIVE_UPDATE') {
             const { menus: pubMenus, profile: pubProfile, timestamp } = event.data;
             if (pubMenus && Array.isArray(pubMenus)) {
-              const sMenus = ensureHasWfaMenu(pubMenus);
-              setLiveMenus(sMenus);
-              setMenus(sMenus);
+              setLiveMenus(ensureHasWfaMenu(pubMenus));
             }
             if (pubProfile) {
               setLiveProfile(pubProfile);
-              setProfile(pubProfile);
             }
             if (timestamp) {
               setLastPublishedAt(timestamp);
@@ -239,16 +232,12 @@ export default function App() {
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === LOCAL_STORAGE_LIVE_MENUS_KEY && e.newValue) {
         try {
-          const m = ensureHasWfaMenu(JSON.parse(e.newValue));
-          setLiveMenus(m);
-          setMenus(m);
+          setLiveMenus(ensureHasWfaMenu(JSON.parse(e.newValue)));
         } catch {}
       }
       if (e.key === LOCAL_STORAGE_LIVE_PROFILE_KEY && e.newValue) {
         try {
-          const p = JSON.parse(e.newValue);
-          setLiveProfile(p);
-          setProfile(p);
+          setLiveProfile(JSON.parse(e.newValue));
         } catch {}
       }
       if (e.key === LOCAL_STORAGE_LAST_PUBLISHED_KEY && e.newValue) {
@@ -289,42 +278,26 @@ export default function App() {
     };
   }, []);
 
-  // Track latest menus and profile in ref for realtime diffing
-  const menusRef = useRef(menus);
-  menusRef.current = menus;
-  const profileRef = useRef(profile);
-  profileRef.current = profile;
-
-  // 3. Real-time Cloud Sync for Admin Draft across Handphone & PC
-  // When an admin makes changes on PC, the Handphone view updates immediately!
+  // 3. Real-time Cloud Sync for Admin Draft (work-in-progress)
   useEffect(() => {
     const unsubscribe = subscribeToAdminDraft((draftData) => {
       if (draftData && Array.isArray(draftData.menus) && draftData.profile) {
-        const syncedDraftMenus = ensureHasWfaMenu(draftData.menus);
-        const draftMenusStr = JSON.stringify(syncedDraftMenus);
-        const currMenusStr = JSON.stringify(menusRef.current);
-
-        if (draftMenusStr !== currMenusStr) {
+        if (!isInitialDraftLoadedFromCloudRef.current) {
+          const syncedDraftMenus = ensureHasWfaMenu(draftData.menus);
           setMenus(syncedDraftMenus);
-          setLiveMenus(syncedDraftMenus);
-          try {
-            localStorage.setItem(LOCAL_STORAGE_MENUS_KEY, draftMenusStr);
-            localStorage.setItem(LOCAL_STORAGE_LIVE_MENUS_KEY, draftMenusStr);
-          } catch {}
-        }
-
-        const draftProfStr = JSON.stringify(draftData.profile);
-        const currProfStr = JSON.stringify(profileRef.current);
-        if (draftProfStr !== currProfStr) {
           setProfile(draftData.profile);
-          setLiveProfile(draftData.profile);
-          try {
-            localStorage.setItem(LOCAL_STORAGE_PROFILE_KEY, draftProfStr);
-            localStorage.setItem(LOCAL_STORAGE_LIVE_PROFILE_KEY, draftProfStr);
-          } catch {}
-        }
+          isInitialDraftLoadedFromCloudRef.current = true;
 
-        isInitialDraftLoadedFromCloudRef.current = true;
+          const hadWfa = draftData.menus.some(
+            (m: MenuItem) =>
+              m.id === 'menu-wfa-bimbingan' ||
+              m.url === '#wfa-bimbingan' ||
+              m.title?.toLowerCase().includes('wfa bimbingan')
+          );
+          if (!hadWfa) {
+            saveAdminDraftToCloud(syncedDraftMenus, draftData.profile).catch(console.warn);
+          }
+        }
       }
     });
 
@@ -332,204 +305,6 @@ export default function App() {
       unsubscribe();
     };
   }, []);
-
-  // Quota circuit breaker state
-  const [isQuotaLimited, setIsQuotaLimited] = useState(() => getIsQuotaExceeded());
-  useEffect(() => {
-    return subscribeToQuotaExceeded((exceeded) => {
-      setIsQuotaLimited(exceeded);
-    });
-  }, []);
-
-  // Save admin working draft changes (only when admin is actively logged in) with 5s debounce
-  const isFirstMountForDraftSync = useRef(true);
-  useEffect(() => {
-    if (isFirstMountForDraftSync.current) {
-      isFirstMountForDraftSync.current = false;
-      return;
-    }
-    if (!isAdminAuthenticated || isQuotaLimited) return;
-    const timer = setTimeout(() => {
-      saveAdminDraftToCloud(menus, profile).catch(() => {});
-    }, 5000);
-    return () => clearTimeout(timer);
-  }, [menus, profile, isAdminAuthenticated, isQuotaLimited]);
-
-  // Real-time Cloud Listener for WFA Submissions
-  useEffect(() => {
-    const unsubscribe = subscribeToWfaSubmissions((cloudWfaList) => {
-      if (Array.isArray(cloudWfaList) && cloudWfaList.length > 0) {
-        setWfaSubmissions(cloudWfaList);
-        try {
-          localStorage.setItem(LOCAL_STORAGE_WFA_SUBMISSIONS_KEY, JSON.stringify(cloudWfaList));
-        } catch {}
-      }
-    });
-    return () => unsubscribe();
-  }, []);
-
-  // Real-time Cloud Listener for Kebugaran Submissions (Guaranteed 76+ data)
-  useEffect(() => {
-    const unsubscribe = subscribeToKebugaranSubmissions((cloudKbgList) => {
-      if (Array.isArray(cloudKbgList) && cloudKbgList.length > 0) {
-        setKebugaranSubmissions(cloudKbgList);
-        try {
-          localStorage.setItem(LOCAL_STORAGE_KEBUGARAN_SUBMISSIONS_KEY, JSON.stringify(cloudKbgList));
-        } catch {}
-      }
-    });
-    return () => unsubscribe();
-  }, []);
-
-  // Initial immediate fetch on mount to guarantee fresh cloud state
-  useEffect(() => {
-    const fetchImmediateInitialData = async () => {
-      try {
-        const [cloudPortal, cloudDraft, cloudWfa, cloudKbg] = await Promise.all([
-          getLivePortalOnce(),
-          getAdminDraftOnce(),
-          getWfaSubmissionsOnce(),
-          getKebugaranSubmissionsOnce()
-        ]);
-
-        const chosenPortal = cloudPortal || cloudDraft;
-        if (chosenPortal && Array.isArray(chosenPortal.menus) && chosenPortal.profile) {
-          const syncedMenus = ensureHasWfaMenu(chosenPortal.menus);
-          setLiveMenus(syncedMenus);
-          setLiveProfile(chosenPortal.profile);
-          setMenus(syncedMenus);
-          setProfile(chosenPortal.profile);
-          try {
-            localStorage.setItem(LOCAL_STORAGE_LIVE_MENUS_KEY, JSON.stringify(syncedMenus));
-            localStorage.setItem(LOCAL_STORAGE_LIVE_PROFILE_KEY, JSON.stringify(chosenPortal.profile));
-            localStorage.setItem(LOCAL_STORAGE_MENUS_KEY, JSON.stringify(syncedMenus));
-            localStorage.setItem(LOCAL_STORAGE_PROFILE_KEY, JSON.stringify(chosenPortal.profile));
-          } catch {}
-        }
-
-        if (Array.isArray(cloudWfa) && cloudWfa.length > 0) {
-          setWfaSubmissions(cloudWfa);
-          try {
-            localStorage.setItem(LOCAL_STORAGE_WFA_SUBMISSIONS_KEY, JSON.stringify(cloudWfa));
-          } catch {}
-        }
-
-        if (Array.isArray(cloudKbg) && cloudKbg.length > 0) {
-          setKebugaranSubmissions(cloudKbg);
-          try {
-            localStorage.setItem(LOCAL_STORAGE_KEBUGARAN_SUBMISSIONS_KEY, JSON.stringify(cloudKbg));
-          } catch {}
-        }
-      } catch (err) {
-        console.warn('Initial one-time cloud fetch error:', err);
-      }
-    };
-
-    fetchImmediateInitialData();
-  }, []);
-
-  // Handler for refreshing WFA submissions
-  const handleRefreshWfa = async () => {
-    try {
-      const cloudWfa = await getWfaSubmissionsOnce();
-      if (Array.isArray(cloudWfa) && cloudWfa.length > 0) {
-        setWfaSubmissions(cloudWfa);
-        try {
-          localStorage.setItem(LOCAL_STORAGE_WFA_SUBMISSIONS_KEY, JSON.stringify(cloudWfa));
-        } catch {}
-        setSyncStatusToast(`✅ Data WFA Bimbingan berhasil diperbarui (${cloudWfa.length} data pengajuan)`);
-        setTimeout(() => setSyncStatusToast(null), 3500);
-      } else {
-        setSyncStatusToast(`✅ Data WFA Bimbingan terhubung (${wfaSubmissions.length} data)`);
-        setTimeout(() => setSyncStatusToast(null), 3500);
-      }
-    } catch (e) {
-      console.warn('Refresh WFA error:', e);
-    }
-  };
-
-  // Handler for refreshing Kebugaran submissions
-  const handleRefreshKebugaran = async () => {
-    try {
-      const cloudKbg = await getKebugaranSubmissionsOnce();
-      if (Array.isArray(cloudKbg) && cloudKbg.length > 0) {
-        setKebugaranSubmissions(cloudKbg);
-        try {
-          localStorage.setItem(LOCAL_STORAGE_KEBUGARAN_SUBMISSIONS_KEY, JSON.stringify(cloudKbg));
-        } catch {}
-        setSyncStatusToast(`✅ Data Tes Kebugaran Pegawai berhasil diperbarui (${cloudKbg.length} data periksa)`);
-        setTimeout(() => setSyncStatusToast(null), 3500);
-      } else {
-        setSyncStatusToast(`✅ Data Tes Kebugaran Pegawai termuat (${kebugaranSubmissions.length} data periksa)`);
-        setTimeout(() => setSyncStatusToast(null), 3500);
-      }
-    } catch (e) {
-      console.warn('Refresh Kebugaran error:', e);
-    }
-  };
-
-  // Force sync from Cloud handler (accessible by button in Mobile & Desktop)
-  const [syncStatusToast, setSyncStatusToast] = useState<string | null>(null);
-  const [isForceSyncing, setIsForceSyncing] = useState(false);
-
-  const handleForceSyncFromCloud = async () => {
-    setIsForceSyncing(true);
-    try {
-      // 1. Fetch latest live portal & draft from Firestore
-      const liveData = await getLivePortalOnce();
-      const draft = await getAdminDraftOnce();
-      const chosen = liveData || draft;
-      if (chosen && Array.isArray(chosen.menus) && chosen.profile) {
-        const synced = ensureHasWfaMenu(chosen.menus);
-        setMenus(synced);
-        setProfile(chosen.profile);
-        setLiveMenus(synced);
-        setLiveProfile(chosen.profile);
-        try {
-          localStorage.setItem(LOCAL_STORAGE_MENUS_KEY, JSON.stringify(synced));
-          localStorage.setItem(LOCAL_STORAGE_PROFILE_KEY, JSON.stringify(chosen.profile));
-          localStorage.setItem(LOCAL_STORAGE_LIVE_MENUS_KEY, JSON.stringify(synced));
-          localStorage.setItem(LOCAL_STORAGE_LIVE_PROFILE_KEY, JSON.stringify(chosen.profile));
-        } catch {}
-      }
-
-      // 2. Fetch employee delta
-      const empDelta = await getEmployeeDeltaOnce();
-      if (empDelta) {
-        applyCloudEmployeeDelta(empDelta);
-      }
-
-      // 3. Fetch latest WFA submissions directly from Firestore
-      const cloudWfa = await getWfaSubmissionsOnce();
-      if (Array.isArray(cloudWfa) && cloudWfa.length > 0) {
-        setWfaSubmissions(cloudWfa);
-        try {
-          localStorage.setItem(LOCAL_STORAGE_WFA_SUBMISSIONS_KEY, JSON.stringify(cloudWfa));
-        } catch {}
-      }
-
-      // 4. Fetch latest Kebugaran submissions directly from Firestore
-      const cloudKbg = await getKebugaranSubmissionsOnce();
-      if (Array.isArray(cloudKbg) && cloudKbg.length > 0) {
-        setKebugaranSubmissions(cloudKbg);
-        try {
-          localStorage.setItem(LOCAL_STORAGE_KEBUGARAN_SUBMISSIONS_KEY, JSON.stringify(cloudKbg));
-        } catch {}
-      }
-
-      setIsCloudSynced(true);
-      setSyncStatusToast('✅ Sinkronisasi Berhasil: Menu, data pegawai, pengajuan WFA, dan data kebugaran telah 100% selaras dan realtime!');
-      setTimeout(() => setSyncStatusToast(null), 4000);
-      return { success: true };
-    } catch (e: any) {
-      console.warn('Force sync error:', e);
-      setSyncStatusToast('Sinkronisasi cloud selesai.');
-      setTimeout(() => setSyncStatusToast(null), 3000);
-      return { success: false };
-    } finally {
-      setIsForceSyncing(false);
-    }
-  };
 
   // 4. Real-time Cloud Sync for Click Logs / Analytics
   useEffect(() => {
@@ -543,6 +318,14 @@ export default function App() {
       unsubscribe();
     };
   }, []);
+
+  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState<boolean>(() => {
+    try {
+      return sessionStorage.getItem(SESSION_ADMIN_AUTH_KEY) === 'true';
+    } catch {
+      return false;
+    }
+  });
 
   const [currentView, setCurrentView] = useState<'public' | 'admin' | 'split'>(() => {
     try {
@@ -728,52 +511,6 @@ export default function App() {
       // ignore
     }
   }, [kebugaranSubmissions]);
-
-  // Auto-sync any local-only pending submissions to Cloud Firestore (prevents data loss)
-  const isSyncingPendingRef = useRef(false);
-  useEffect(() => {
-    if (isSyncingPendingRef.current) return;
-    const unsyncedWfa = wfaSubmissions.filter((s) => s.id && s.id.startsWith('wfa-'));
-    const unsyncedKbg = kebugaranSubmissions.filter((s) => s.id && s.id.startsWith('kbg-'));
-
-    if (unsyncedWfa.length === 0 && unsyncedKbg.length === 0) return;
-
-    isSyncingPendingRef.current = true;
-    (async () => {
-      // Push unsynced WFA submissions to Cloud
-      for (const localSub of unsyncedWfa) {
-        try {
-          const { id, status, createdAt, ...rest } = localSub;
-          const res = await createWfaSubmissionInCloud(rest);
-          if (res.success && res.submission) {
-            setWfaSubmissions((prev) => [
-              res.submission!,
-              ...prev.filter((s) => s.id !== localSub.id && s.id !== res.submission!.id),
-            ]);
-          }
-        } catch (e) {
-          console.warn('Auto-sync WFA submission error:', e);
-        }
-      }
-
-      // Push unsynced Kebugaran submissions to Cloud
-      for (const localSub of unsyncedKbg) {
-        try {
-          const { id, createdAt, ...rest } = localSub;
-          const res = await createKebugaranSubmissionInCloud(rest);
-          if (res.success && res.submission) {
-            setKebugaranSubmissions((prev) => [
-              res.submission!,
-              ...prev.filter((s) => s.id !== localSub.id && s.id !== res.submission!.id),
-            ]);
-          }
-        } catch (e) {
-          console.warn('Auto-sync Kebugaran submission error:', e);
-        }
-      }
-      isSyncingPendingRef.current = false;
-    })();
-  }, [wfaSubmissions, kebugaranSubmissions]);
 
   // Ensure WFA & Kebugaran menus exist in menus & liveMenus
   useEffect(() => {
@@ -1270,8 +1007,6 @@ export default function App() {
           lastPublishedAt={lastPublishedAt}
           profile={profile}
           totalClicks={totalClicks}
-          onRefreshCloud={handleForceSyncFromCloud}
-          isForceSyncing={isForceSyncing}
         />
       )}
 
@@ -1342,13 +1077,9 @@ export default function App() {
             wfaSubmissions={wfaSubmissions}
             onUpdateWfaStatus={handleUpdateWfaStatus}
             onDeleteWfaSubmission={handleDeleteWfaSubmission}
-            onRefreshWfa={handleRefreshWfa}
             kebugaranSubmissions={kebugaranSubmissions}
             onDeleteKebugaranSubmission={handleDeleteKebugaranSubmission}
-            onRefreshKebugaran={handleRefreshKebugaran}
             onOpenKebugaranModal={() => setIsAdminKebugaranModalOpen(true)}
-            onForceSyncCloud={handleForceSyncFromCloud}
-            isForceSyncing={isForceSyncing}
           />
         )}
 
@@ -1379,13 +1110,9 @@ export default function App() {
                 wfaSubmissions={wfaSubmissions}
                 onUpdateWfaStatus={handleUpdateWfaStatus}
                 onDeleteWfaSubmission={handleDeleteWfaSubmission}
-                onRefreshWfa={handleRefreshWfa}
                 kebugaranSubmissions={kebugaranSubmissions}
                 onDeleteKebugaranSubmission={handleDeleteKebugaranSubmission}
-                onRefreshKebugaran={handleRefreshKebugaran}
                 onOpenKebugaranModal={() => setIsAdminKebugaranModalOpen(true)}
-                onForceSyncCloud={handleForceSyncFromCloud}
-                isForceSyncing={isForceSyncing}
               />
             </div>
 
@@ -1418,27 +1145,6 @@ export default function App() {
           </div>
         )}
       </main>
-
-      {/* Floating Real-time Sync Toast */}
-      <AnimatePresence>
-        {syncStatusToast && (
-          <motion.div
-            initial={{ opacity: 0, y: 30, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 20, scale: 0.95 }}
-            className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-4 py-3 bg-slate-900 text-white text-xs font-semibold rounded-xl shadow-2xl border border-emerald-500/40 flex items-center gap-2.5 max-w-[90vw] sm:max-w-md backdrop-blur-md"
-          >
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping shrink-0" />
-            <span className="flex-1">{syncStatusToast}</span>
-            <button
-              onClick={() => setSyncStatusToast(null)}
-              className="p-1 rounded-md text-slate-400 hover:text-white hover:bg-slate-800 transition-colors text-xs"
-            >
-              ✕
-            </button>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       {/* Global Publish Success Toast Notification */}
       <AnimatePresence>
@@ -1482,30 +1188,11 @@ export default function App() {
 
                 <div className="space-y-1.5">
                   <h3 className="text-lg font-bold text-slate-900">
-                    Perubahan Berhasil Diposting ke Seluruh Device!
+                    Perubahan Berhasil Diposting!
                   </h3>
                   <p className="text-xs text-slate-600 leading-relaxed">
-                    Semua perubahan menu, tautan, logo, dan tema telah diposting dan <strong>langsung tayang seketika</strong> pada seluruh smartphone, tablet, dan laptop pegawai.
+                    Semua perubahan menu, tautan, dan tema telah diperbarui dan langsung tayang pada <strong>Halaman Portal Pegawai</strong>.
                   </p>
-                </div>
-
-                {/* Device sync status badges */}
-                <div className="grid grid-cols-3 gap-2 py-1">
-                  <div className="p-2 bg-emerald-50 border border-emerald-200 rounded-xl text-center">
-                    <span className="text-base block">📱</span>
-                    <span className="text-[10px] font-bold text-emerald-800">HP / Ponsel</span>
-                    <span className="text-[9px] text-emerald-600 block font-semibold">Tersinkron</span>
-                  </div>
-                  <div className="p-2 bg-emerald-50 border border-emerald-200 rounded-xl text-center">
-                    <span className="text-base block">💻</span>
-                    <span className="text-[10px] font-bold text-emerald-800">Laptop / PC</span>
-                    <span className="text-[9px] text-emerald-600 block font-semibold">Tersinkron</span>
-                  </div>
-                  <div className="p-2 bg-emerald-50 border border-emerald-200 rounded-xl text-center">
-                    <span className="text-base block">📟</span>
-                    <span className="text-[10px] font-bold text-emerald-800">Tablet / iPad</span>
-                    <span className="text-[9px] text-emerald-600 block font-semibold">Tersinkron</span>
-                  </div>
                 </div>
 
                 <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-left text-xs space-y-1.5 font-mono">
@@ -1520,13 +1207,13 @@ export default function App() {
                   <div className="flex justify-between text-slate-600">
                     <span>Status Cloud Database:</span>
                     <span className={`font-bold flex items-center gap-1 ${publishStatus?.cloudSynced ? 'text-emerald-600' : 'text-amber-600'}`}>
-                      {publishStatus?.cloudSynced ? '🟢 Sinkron Realtime (Seluruh Device)' : '🟡 Tersimpan Lokal'}
+                      {publishStatus?.cloudSynced ? '🟢 Sinkron (Semua Device)' : '🟡 Tersimpan Lokal'}
                     </span>
                   </div>
                   <div className="flex justify-between text-slate-600">
                     <span>Waktu Publikasi:</span>
                     <span className="font-bold text-emerald-600">
-                      {new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' })} WIB
+                      {new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })} WIB
                     </span>
                   </div>
                 </div>

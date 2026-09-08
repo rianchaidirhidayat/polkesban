@@ -11,8 +11,7 @@ export async function optimizeImageForStorage(
   maxHeight = 160,
   quality = 0.85
 ): Promise<string> {
-  // If it's empty, standard icon name, or non-data URL, return as-is immediately
-  if (!source) return '';
+  // If it's a standard icon name or emoji, return as-is immediately
   if (typeof source === 'string') {
     if (!source.startsWith('data:image/') && !source.startsWith('blob:')) {
       return source;
@@ -20,95 +19,68 @@ export async function optimizeImageForStorage(
   }
 
   return new Promise((resolve) => {
-    let isSettled = false;
-    const safeResolve = (val: string) => {
-      if (!isSettled) {
-        isSettled = true;
-        resolve(val);
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+
+    img.onload = () => {
+      try {
+        let { width, height } = img;
+        if (width <= 0 || height <= 0) {
+          resolve(typeof source === 'string' ? source : '');
+          return;
+        }
+
+        // Maintain aspect ratio while bounding within maxWidth & maxHeight
+        if (width > maxWidth || height > maxHeight) {
+          const ratio = Math.min(maxWidth / width, maxHeight / height);
+          width = Math.max(1, Math.round(width * ratio));
+          height = Math.max(1, Math.round(height * ratio));
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+
+        if (!ctx) {
+          resolve(typeof source === 'string' ? source : '');
+          return;
+        }
+
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(img, 0, 0, width, height);
+
+        // Try WebP first for optimal compression (typically 70% smaller than PNG)
+        let output = canvas.toDataURL('image/webp', quality);
+        if (!output.startsWith('data:image/webp')) {
+          output = canvas.toDataURL('image/png');
+        }
+
+        resolve(output);
+      } catch (err) {
+        console.warn('Canvas image optimization failed, returning original:', err);
+        resolve(typeof source === 'string' ? source : '');
       }
     };
 
-    // Strict 500ms safety timeout so the UI never hangs or freezes
-    const timer = setTimeout(() => {
-      safeResolve(typeof source === 'string' ? source : '');
-    }, 500);
+    img.onerror = () => {
+      resolve(typeof source === 'string' ? source : '');
+    };
 
-    try {
-      const img = new Image();
-
-      img.onload = () => {
-        clearTimeout(timer);
-        try {
-          let { width, height } = img;
-          if (width <= 0 || height <= 0) {
-            safeResolve(typeof source === 'string' ? source : '');
-            return;
-          }
-
-          // Maintain aspect ratio while bounding within maxWidth & maxHeight
-          if (width > maxWidth || height > maxHeight) {
-            const ratio = Math.min(maxWidth / width, maxHeight / height);
-            width = Math.max(1, Math.round(width * ratio));
-            height = Math.max(1, Math.round(height * ratio));
-          }
-
-          const canvas = document.createElement('canvas');
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext('2d');
-
-          if (!ctx) {
-            safeResolve(typeof source === 'string' ? source : '');
-            return;
-          }
-
-          ctx.imageSmoothingEnabled = true;
-          ctx.imageSmoothingQuality = 'high';
-          ctx.drawImage(img, 0, 0, width, height);
-
-          // Try WebP first for optimal compression (typically 70% smaller than PNG)
-          let output = canvas.toDataURL('image/webp', quality);
-          if (!output.startsWith('data:image/webp')) {
-            output = canvas.toDataURL('image/png');
-          }
-
-          safeResolve(output);
-        } catch (err) {
-          console.warn('Canvas image optimization failed, returning original:', err);
-          safeResolve(typeof source === 'string' ? source : '');
+    if (typeof source === 'string') {
+      img.src = source;
+    } else {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        if (e.target?.result) {
+          img.src = e.target.result as string;
+        } else {
+          resolve('');
         }
       };
-
-      img.onerror = () => {
-        clearTimeout(timer);
-        safeResolve(typeof source === 'string' ? source : '');
-      };
-
-      if (typeof source === 'string') {
-        // Do NOT set crossOrigin on data: or blob: URIs
-        if (!source.startsWith('data:') && !source.startsWith('blob:')) {
-          img.crossOrigin = 'anonymous';
-        }
-        img.src = source;
-      } else {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          if (e.target?.result) {
-            img.src = e.target.result as string;
-          } else {
-            clearTimeout(timer);
-            safeResolve('');
-          }
-        };
-        reader.onerror = () => {
-          clearTimeout(timer);
-          safeResolve('');
-        };
-        reader.readAsDataURL(source);
-      }
-    } catch (e) {
-      clearTimeout(timer);
-      safeResolve(typeof source === 'string' ? source : '');
+      reader.onerror = () => resolve('');
+      reader.readAsDataURL(source);
     }
   });
 }

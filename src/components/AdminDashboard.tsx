@@ -91,8 +91,6 @@ interface AdminDashboardProps {
   onDeleteKebugaranSubmission?: (id: string) => Promise<{ success: boolean; error?: string }>;
   onRefreshKebugaran?: () => void;
   onOpenKebugaranModal?: () => void;
-  onForceSyncCloud?: () => Promise<any>;
-  isForceSyncing?: boolean;
 }
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({
@@ -122,8 +120,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   onDeleteKebugaranSubmission,
   onRefreshKebugaran,
   onOpenKebugaranModal,
-  onForceSyncCloud,
-  isForceSyncing = false,
 }) => {
   const [activeTab, setActiveTab] = useState<'menus' | 'theme' | 'employees' | 'analytics' | 'wfa_monitoring' | 'kebugaran_monitoring' | 'export' | 'security'>('menus');
   const [editingMenu, setEditingMenu] = useState<MenuItem | null>(null);
@@ -167,14 +163,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
   }, [menus, profile, liveMenus, liveProfile]);
 
-  // Debounced auto-publish effect when autoPublishEnabled is true (Ultra-responsive 500ms sync)
+  // Debounced auto-publish effect when autoPublishEnabled is true
   React.useEffect(() => {
     if (!autoPublishEnabled || !onPublish || isPublishing) return;
     if (!hasUnpublishedChanges) return;
 
     const timer = setTimeout(() => {
       onPublish();
-    }, 500);
+    }, 1800);
 
     return () => clearTimeout(timer);
   }, [autoPublishEnabled, hasUnpublishedChanges, onPublish, isPublishing]);
@@ -331,249 +327,143 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   return (
     <div className="w-full min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans">
       {/* Top Admin Sub-Header Navigation */}
-      <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-200 px-3 sm:px-8 py-2 sm:py-3 shadow-xs">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2.5">
-          {/* Mobile Top Action Bar: Tab indicator + Realtime Badge + Quick Actions */}
-          <div className="flex items-center justify-between gap-2 md:hidden">
-            <div className="flex items-center gap-1.5 min-w-0">
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-              <div className="flex flex-col min-w-0">
-                <span className="text-xs font-bold text-slate-900 truncate">
-                  {activeTab === 'menus' && `Kelola Menu (${menus.length})`}
-                  {activeTab === 'theme' && 'Tema & Profil'}
-                  {activeTab === 'employees' && 'Database Pegawai'}
-                  {activeTab === 'analytics' && 'Analitik Klik'}
-                  {activeTab === 'wfa_monitoring' && 'Monitoring WFA'}
-                  {activeTab === 'kebugaran_monitoring' && 'Monitoring Kebugaran'}
-                  {activeTab === 'export' && 'Ekspor Data'}
-                  {activeTab === 'security' && 'Keamanan & PIN'}
-                </span>
-                <span className="text-[10px] text-emerald-700 font-semibold flex items-center gap-1">
-                  <span>📱 HP & PC Realtime Selaras</span>
-                </span>
-              </div>
-            </div>
+      <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-200 px-4 sm:px-8 py-3 flex flex-wrap items-center justify-between gap-3 shadow-xs">
+        {/* Navigation Tabs */}
+        <div className="flex items-center gap-1.5 p-1 bg-slate-100 border border-slate-200 rounded-lg">
+          <button
+            onClick={() => setActiveTab('menus')}
+            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-md text-xs font-medium transition-all ${
+              activeTab === 'menus'
+                ? 'bg-indigo-600 text-white shadow-xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/70'
+            }`}
+          >
+            <LayoutGrid className="w-3.5 h-3.5" />
+            <span>Kelola Menu ({menus.length})</span>
+          </button>
 
-            <div className="flex items-center gap-1.5 shrink-0">
-              {onPublish && (
-                <button
-                  onClick={onPublish}
-                  disabled={isPublishing}
-                  title="Posting / Update Live ke Seluruh HP, Tablet, dan Laptop Pegawai Sekarang"
-                  className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-bold transition-all shadow-sm ${
-                    hasUnpublishedChanges
-                      ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white animate-pulse'
-                      : 'bg-emerald-600 text-white hover:bg-emerald-700'
-                  }`}
-                >
-                  <Zap className={`w-3.5 h-3.5 ${isPublishing ? 'animate-spin' : ''}`} />
-                  <span className="text-[11px]">{isPublishing ? 'Posting...' : '🚀 Update Live'}</span>
-                </button>
-              )}
+          <button
+            onClick={() => setActiveTab('theme')}
+            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-md text-xs font-medium transition-all ${
+              activeTab === 'theme'
+                ? 'bg-indigo-600 text-white shadow-xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/70'
+            }`}
+          >
+            <Palette className="w-3.5 h-3.5" />
+            <span>Tema & Profil</span>
+          </button>
 
-              {onForceSyncCloud && (
-                <button
-                  onClick={onForceSyncCloud}
-                  disabled={isForceSyncing}
-                  title="Sinkronkan data dengan Cloud sekarang"
-                  className="flex items-center gap-1 px-2 py-1 rounded-md bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold border border-emerald-300 shadow-2xs"
-                >
-                  <RefreshCw className={`w-3 h-3 text-emerald-700 ${isForceSyncing ? 'animate-spin' : ''}`} />
-                  <span className="text-[11px]">{isForceSyncing ? '...' : 'Sync'}</span>
-                </button>
-              )}
+          <button
+            onClick={() => setActiveTab('employees')}
+            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-md text-xs font-medium transition-all ${
+              activeTab === 'employees'
+                ? 'bg-indigo-600 text-white shadow-xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/70'
+            }`}
+          >
+            <Users className="w-3.5 h-3.5" />
+            <span>Database Pegawai</span>
+          </button>
 
-              {activeTab === 'menus' && (
-                <button
-                  onClick={handleAddNewMenu}
-                  className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-xs"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span className="text-[11px]">Tambah</span>
-                </button>
-              )}
+          <button
+            onClick={() => setActiveTab('analytics')}
+            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-md text-xs font-medium transition-all ${
+              activeTab === 'analytics'
+                ? 'bg-indigo-600 text-white shadow-xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/70'
+            }`}
+          >
+            <BarChart3 className="w-3.5 h-3.5" />
+            <span>Analitik Klik</span>
+          </button>
 
-              <button
-                onClick={onOpenPublicPreview}
-                title="Buka Halaman Pegawai"
-                className="p-1.5 rounded-md bg-white hover:bg-slate-50 text-slate-700 border border-slate-200"
-              >
-                <Eye className="w-3.5 h-3.5 text-indigo-600" />
-              </button>
-            </div>
-          </div>
-
-          {/* Navigation Tabs (Scrollable horizontal strip on mobile, flex on desktop) */}
-          <div className="w-full md:w-auto overflow-x-auto no-scrollbar scroll-smooth flex items-center gap-1 p-1 bg-slate-100/90 border border-slate-200 rounded-xl">
-            <button
-              onClick={() => setActiveTab('menus')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap shrink-0 transition-all ${
-                activeTab === 'menus'
-                  ? 'bg-indigo-600 text-white shadow-xs font-bold'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/70'
-              }`}
-            >
-              <LayoutGrid className="w-3.5 h-3.5" />
-              <span>Kelola Menu ({menus.length})</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab('theme')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap shrink-0 transition-all ${
-                activeTab === 'theme'
-                  ? 'bg-indigo-600 text-white shadow-xs font-bold'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/70'
-              }`}
-            >
-              <Palette className="w-3.5 h-3.5" />
-              <span>Tema & Profil</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab('employees')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap shrink-0 transition-all ${
-                activeTab === 'employees'
-                  ? 'bg-indigo-600 text-white shadow-xs font-bold'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/70'
-              }`}
-            >
-              <Users className="w-3.5 h-3.5" />
-              <span>Database Pegawai</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab('analytics')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap shrink-0 transition-all ${
-                activeTab === 'analytics'
-                  ? 'bg-indigo-600 text-white shadow-xs font-bold'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/70'
-              }`}
-            >
-              <BarChart3 className="w-3.5 h-3.5" />
-              <span>Analitik Klik</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab('wfa_monitoring')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap shrink-0 transition-all relative ${
-                activeTab === 'wfa_monitoring'
-                  ? 'bg-emerald-600 text-white shadow-xs font-bold'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/70'
-              }`}
-            >
-              <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
-              <span>Monitoring WFA</span>
-              {wfaSubmissions.filter(s => s.status === 'Menunggu Validasi').length > 0 && (
-                <span className="px-1.5 py-0.2 rounded-full bg-amber-500 text-slate-950 font-black text-[10px] animate-pulse">
-                  {wfaSubmissions.filter(s => s.status === 'Menunggu Validasi').length}
-                </span>
-              )}
-            </button>
-
-            <button
-              onClick={() => setActiveTab('kebugaran_monitoring')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap shrink-0 transition-all relative ${
-                activeTab === 'kebugaran_monitoring'
-                  ? 'bg-sky-600 text-white shadow-xs font-bold'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/70'
-              }`}
-            >
-              <Activity className="w-3.5 h-3.5 text-sky-400" />
-              <span>Monitoring Kebugaran</span>
-              <span className="px-1.5 py-0.2 rounded-full bg-sky-500 text-white font-black text-[10px]">
-                {kebugaranSubmissions.length}
+          <button
+            onClick={() => setActiveTab('wfa_monitoring')}
+            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-md text-xs font-medium transition-all relative ${
+              activeTab === 'wfa_monitoring'
+                ? 'bg-emerald-600 text-white shadow-xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/70'
+            }`}
+          >
+            <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Monitoring WFA</span>
+            {wfaSubmissions.filter(s => s.status === 'Menunggu Validasi').length > 0 && (
+              <span className="px-1.5 py-0.2 rounded-full bg-amber-500 text-slate-950 font-black text-[10px] animate-pulse">
+                {wfaSubmissions.filter(s => s.status === 'Menunggu Validasi').length}
               </span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab('export')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap shrink-0 transition-all ${
-                activeTab === 'export'
-                  ? 'bg-indigo-600 text-white shadow-xs font-bold'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/70'
-              }`}
-            >
-              <Download className="w-3.5 h-3.5" />
-              <span>Ekspor Data</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab('security')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap shrink-0 transition-all ${
-                activeTab === 'security'
-                  ? 'bg-indigo-600 text-white shadow-xs font-bold'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/70'
-              }`}
-            >
-              <Lock className="w-3.5 h-3.5" />
-              <span>Keamanan & PIN</span>
-            </button>
-          </div>
-
-          {/* Desktop Action Controls */}
-          <div className="hidden md:flex items-center gap-2 shrink-0">
-            {onPublish && (
-              <button
-                onClick={onPublish}
-                disabled={isPublishing}
-                title="Posting perubahan langsung ke seluruh device pegawai secara realtime"
-                className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-bold transition-all shadow-md active:scale-95 ${
-                  hasUnpublishedChanges
-                    ? 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white ring-2 ring-emerald-400/50 shadow-emerald-500/20 animate-pulse'
-                    : 'bg-gradient-to-r from-emerald-700 to-teal-700 hover:from-emerald-600 hover:to-teal-600 text-white'
-                }`}
-              >
-                <Zap className={`w-3.5 h-3.5 text-amber-300 ${isPublishing ? 'animate-spin' : ''}`} />
-                <span>
-                  {isPublishing
-                    ? 'Memposting...'
-                    : hasUnpublishedChanges
-                    ? '🚀 Posting ke Seluruh Device'
-                    : '✨ Update Live Pegawai'}
-                </span>
-              </button>
             )}
+          </button>
 
-            {onForceSyncCloud && (
-              <button
-                onClick={onForceSyncCloud}
-                disabled={isForceSyncing}
-                title="Sinkronkan data dengan Cloud"
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium border border-slate-200 transition-colors shadow-xs disabled:opacity-50"
-              >
-                <RefreshCw className={`w-3.5 h-3.5 text-emerald-600 ${isForceSyncing ? 'animate-spin' : ''}`} />
-                <span>{isForceSyncing ? 'Menyinkronkan...' : 'Sinkron Cloud'}</span>
-              </button>
-            )}
+          <button
+            onClick={() => setActiveTab('kebugaran_monitoring')}
+            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-md text-xs font-medium transition-all relative ${
+              activeTab === 'kebugaran_monitoring'
+                ? 'bg-sky-600 text-white shadow-xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/70'
+            }`}
+          >
+            <Activity className="w-3.5 h-3.5 text-sky-400" />
+            <span>Monitoring Kebugaran</span>
+            <span className="px-1.5 py-0.2 rounded-full bg-sky-500 text-white font-black text-[10px]">
+              {kebugaranSubmissions.length}
+            </span>
+          </button>
 
-            <button
-              onClick={() => setShowLiveSidePreview(!showLiveSidePreview)}
-              className={`hidden xl:flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium border transition-all ${
-                showLiveSidePreview
-                  ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
-                  : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-              }`}
-            >
-              <Smartphone className="w-3.5 h-3.5" />
-              <span>Live Preview HP</span>
-            </button>
+          <button
+            onClick={() => setActiveTab('export')}
+            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-md text-xs font-medium transition-all ${
+              activeTab === 'export'
+                ? 'bg-indigo-600 text-white shadow-xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/70'
+            }`}
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>Ekspor Data</span>
+          </button>
 
-            <button
-              onClick={onOpenPublicPreview}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-md bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium border border-slate-200 transition-colors shadow-xs"
-            >
-              <Eye className="w-3.5 h-3.5 text-indigo-600" />
-              <span>Buka Microsite Utama</span>
-            </button>
+          <button
+            onClick={() => setActiveTab('security')}
+            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-md text-xs font-medium transition-all ${
+              activeTab === 'security'
+                ? 'bg-indigo-600 text-white shadow-xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/70'
+            }`}
+          >
+            <Lock className="w-3.5 h-3.5" />
+            <span>Keamanan & PIN</span>
+          </button>
+        </div>
 
-            <button
-              onClick={handleAddNewMenu}
-              className="flex items-center gap-1.5 px-4 py-1.5 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium shadow-sm transition-all"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Tambah Menu</span>
-            </button>
-          </div>
+        {/* Action Controls */}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowLiveSidePreview(!showLiveSidePreview)}
+            className={`hidden xl:flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium border transition-all ${
+              showLiveSidePreview
+                ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+            }`}
+          >
+            <Smartphone className="w-3.5 h-3.5" />
+            <span>Live Preview HP</span>
+          </button>
+
+          <button
+            onClick={onOpenPublicPreview}
+            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-md bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium border border-slate-200 transition-colors shadow-xs"
+          >
+            <Eye className="w-3.5 h-3.5 text-indigo-600" />
+            <span>Buka Microsite Utama</span>
+          </button>
+
+          <button
+            onClick={handleAddNewMenu}
+            className="flex items-center gap-1.5 px-4 py-1.5 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium shadow-sm transition-all"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Tambah Menu</span>
+          </button>
         </div>
       </header>
 
@@ -621,32 +511,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </div>
                 <p className="text-xs text-slate-600 mt-1 max-w-2xl">
                   {hasUnpublishedChanges
-                    ? 'Terdapat perubahan tombol/tema/profil. Tekan tombol "Posting / Update ke Seluruh Device" untuk langsung menerbitkannya ke seluruh HP, Laptop, Tablet pegawai tanpa delay.'
-                    : 'Semua perubahan menu dan profil kustom Anda sudah aktif di Cloud Firestore. Setiap pegawai yang membuka link di HP/PC akan langsung melihat tampilan ini secara real-time.'}
+                    ? 'Terdapat perubahan yang belum diposting. Tekan tombol "Posting / Update Portal" pada bilah atas untuk langsung mempublikasikannya ke seluruh pegawai.'
+                    : 'Semua perubahan menu dan profil kustom Anda sudah aktif di Cloud Firestore. Setiap pegawai yang membuka link akan langsung melihat tampilan ini.'}
                 </p>
               </div>
             </div>
 
             {/* Actions & Auto-publish switch */}
             <div className="flex flex-wrap items-center gap-2.5 pt-2 lg:pt-0 border-t lg:border-t-0 border-slate-200/60">
-              {onPublish && (
-                <button
-                  type="button"
-                  onClick={onPublish}
-                  disabled={isPublishing}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold shadow-md transition-all hover:scale-[1.02] active:scale-95 ${
-                    hasUnpublishedChanges
-                      ? 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white ring-2 ring-emerald-400'
-                      : 'bg-emerald-700 hover:bg-emerald-800 text-white'
-                  }`}
-                >
-                  <Zap className={`w-4 h-4 text-amber-300 ${isPublishing ? 'animate-spin' : ''}`} />
-                  <span>{isPublishing ? 'Sedang Memposting...' : '🚀 Posting ke Seluruh Device Sekarang'}</span>
-                </button>
-              )}
-
               <label
-                className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/80 border border-slate-200 text-xs text-slate-700 cursor-pointer hover:bg-white shadow-2xs transition-colors"
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/80 border border-slate-200 text-xs text-slate-700 cursor-pointer hover:bg-white shadow-2xs transition-colors"
                 title="Jika aktif, setiap perubahan yang Anda lakukan otomatis langsung tersimpan ke Cloud untuk pegawai"
               >
                 <input
@@ -655,13 +529,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   onChange={handleToggleAutoPublish}
                   className="rounded text-emerald-600 focus:ring-emerald-500 w-3.5 h-3.5 cursor-pointer"
                 />
-                <span className="font-medium">⚡ Auto-Posting</span>
+                <span className="font-medium">⚡ Auto-Posting Otomatis</span>
               </label>
 
               <button
                 type="button"
                 onClick={handleCopyShareLink}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white hover:bg-slate-50 text-slate-800 text-xs font-semibold border border-slate-300 shadow-xs transition-colors"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white hover:bg-slate-50 text-slate-800 text-xs font-semibold border border-slate-300 shadow-xs transition-colors"
                 title="Salin tautan resmi yang dapat langsung dibagikan ke seluruh pegawai"
               >
                 <Share2 className="w-3.5 h-3.5 text-indigo-600" />
@@ -678,23 +552,22 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             {activeTab === 'menus' && (
               <div className="space-y-6">
                 {/* Header info banner */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 sm:p-5 bg-white border border-slate-200 rounded-xl shadow-xs">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 bg-white border border-slate-200 rounded-xl shadow-xs">
                   <div>
-                    <h2 className="text-sm sm:text-base font-bold text-slate-900 tracking-tight">Daftar Tombol Direct Menu</h2>
+                    <h2 className="text-base font-bold text-slate-900 tracking-tight">Daftar Tombol Direct Menu</h2>
                     <p className="text-xs text-slate-500 mt-0.5">
-                      Gunakan tombol panah atau tarik & geser untuk mengatur urutan tombol menu di portal.
+                      Tarik & geser (drag-and-drop) untuk mengatur urutan tombol menu yang tampil di microsite.
                     </p>
                   </div>
-                  <div className="flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto">
-                    <span className="text-xs text-slate-600 font-medium px-2.5 py-1 bg-slate-100 rounded-md border border-slate-200">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-slate-500 font-medium px-2.5 py-1 bg-slate-100 rounded-md border border-slate-200">
                       {menus.filter((m) => m.isActive).length} Aktif / {menus.length} Total
                     </span>
                     <button
                       onClick={handleAddNewMenu}
-                      className="px-3 py-1.5 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-xs flex items-center gap-1 transition-colors"
+                      className="px-3 py-1 rounded-md bg-indigo-50 text-indigo-600 border border-indigo-200 text-xs font-semibold hover:bg-indigo-100 transition-colors"
                     >
-                      <Plus className="w-3.5 h-3.5" />
-                      <span>Tambah Menu</span>
+                      + Tambah Menu
                     </button>
                   </div>
                 </div>
@@ -713,7 +586,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           onDragOver={(e) => handleDragOver(e, index)}
                           onDragEnd={handleDragEnd}
                           className={`
-                            group p-3 sm:p-3.5 bg-white border rounded-xl transition-all duration-150
+                            group p-3.5 bg-white border rounded-xl transition-all duration-150
                             ${
                               isDragging
                                 ? 'opacity-40 border-dashed border-indigo-500 scale-95 shadow-lg bg-indigo-50/50'
@@ -723,19 +596,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           `}
                         >
                           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                            {/* Top / Left: Drag Handle, Icon, Title, Subtitle, Badges */}
-                            <div className="flex items-start sm:items-center gap-2.5 sm:gap-3 flex-1 min-w-0">
-                              {/* Position Badge & Drag Handle */}
-                              <div className="flex items-center gap-1 shrink-0">
-                                <span className="sm:hidden text-[10px] font-mono font-bold text-slate-400 w-5 text-center">
-                                  #{index + 1}
-                                </span>
-                                <div
-                                  title="Tahan dan geser untuk memindahkan posisi"
-                                  className="hidden sm:block cursor-grab active:cursor-grabbing p-1.5 rounded-md text-slate-300 group-hover:text-slate-500 hover:bg-slate-100 transition-colors shrink-0"
-                                >
-                                  <GripVertical className="w-5 h-5" />
-                                </div>
+                            {/* Left: Drag Handle, Icon, Title, Subtitle, Badges */}
+                            <div className="flex items-center gap-3 flex-1 min-w-0">
+                              {/* Drag Handle */}
+                              <div
+                                title="Tahan dan geser untuk memindahkan posisi"
+                                className="cursor-grab active:cursor-grabbing p-1.5 rounded-md text-slate-300 group-hover:text-slate-500 hover:bg-slate-100 transition-colors shrink-0"
+                              >
+                                <GripVertical className="w-5 h-5" />
                               </div>
 
                               {/* Icon Box with Button Color Accent */}
@@ -746,15 +614,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                     : menu.bgColor,
                                   color: menu.textColor || '#ffffff',
                                 }}
-                                className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center shrink-0 shadow-xs overflow-hidden p-1.5"
+                                className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 shadow-xs overflow-hidden p-1.5"
                               >
-                                {getIconComponent(menu.iconName, 'w-full h-full max-w-[22px] max-h-[22px] sm:max-w-[24px] sm:max-h-[24px]')}
+                                {getIconComponent(menu.iconName, 'w-full h-full max-w-[24px] max-h-[24px]')}
                               </div>
 
                               {/* Title & Metadata */}
                               <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-                                  <h3 className="text-sm font-bold sm:font-semibold text-slate-900 truncate max-w-[200px] sm:max-w-none">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <h3 className="text-sm font-semibold text-slate-900 truncate">
                                     {menu.title}
                                   </h3>
                                   {menu.badgeText && (
@@ -763,41 +631,41 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                         backgroundColor: menu.badgeBgColor || '#f59e0b',
                                         color: menu.badgeTextColor || '#000',
                                       }}
-                                      className="text-[9px] sm:text-[10px] font-bold px-1.5 py-0.2 rounded uppercase tracking-wider shrink-0"
+                                      className="text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider"
                                     >
                                       {menu.badgeText}
                                     </span>
                                   )}
                                   {menu.category && (
-                                    <span className="text-[9px] sm:text-[10px] px-1.5 py-0.2 rounded-full bg-slate-100 text-slate-600 border border-slate-200 shrink-0">
+                                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
                                       {menu.category}
                                     </span>
                                   )}
                                   {menu.isProtected && (
                                     <span
                                       title={`Menu terproteksi PIN: ${menu.pinCode || 'Aktif'}`}
-                                      className="text-[9px] sm:text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-amber-50 text-amber-800 border border-amber-300 flex items-center gap-0.5 shrink-0"
+                                      className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-300 flex items-center gap-1"
                                     >
                                       <Lock className="w-2.5 h-2.5 text-amber-600" />
-                                      <span>PIN</span>
+                                      <span>PIN: {menu.pinCode || 'Aktif'}</span>
                                     </span>
                                   )}
                                 </div>
 
-                                <div className="flex items-center gap-2 sm:gap-3 text-xs text-slate-400 mt-0.5 flex-wrap">
-                                  <span className="truncate max-w-[170px] sm:max-w-[220px] font-mono text-[10px] sm:text-[11px] text-slate-500">
+                                <div className="flex items-center gap-3 text-xs text-slate-400 mt-0.5 flex-wrap">
+                                  <span className="truncate max-w-[220px] font-mono text-[11px] text-slate-500">
                                     {menu.url}
                                   </span>
-                                  <span className="font-mono text-indigo-600 text-[10px] sm:text-[11px] font-semibold flex items-center gap-1">
-                                    <Zap className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-amber-500" />
+                                  <span className="font-mono text-indigo-600 text-[11px] font-semibold flex items-center gap-1">
+                                    <Zap className="w-3 h-3 text-amber-500" />
                                     {menu.clickCount} klik
                                   </span>
                                 </div>
                               </div>
                             </div>
 
-                            {/* Desktop Controls (hidden on mobile, inline on desktop) */}
-                            <div className="hidden sm:flex items-center gap-1.5 self-end sm:self-center shrink-0 flex-wrap">
+                            {/* Right: Real-time Quick Size Selector & Actions */}
+                            <div className="flex items-center gap-1.5 self-end sm:self-center shrink-0 flex-wrap">
                               {/* Quick Size Switcher */}
                               <div className="flex items-center bg-slate-100 border border-slate-200 rounded-md p-0.5">
                                 {(
@@ -882,97 +750,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
                               </button>
-                            </div>
-                          </div>
-
-                          {/* Mobile Dedicated Action Controls (Clean, touch-friendly rows) */}
-                          <div className="sm:hidden flex flex-col gap-2 pt-2.5 mt-2 border-t border-slate-100 w-full">
-                            {/* Row 1: Size Switcher + Reorder Buttons */}
-                            <div className="flex items-center justify-between gap-2">
-                              {/* Size Selector */}
-                              <div className="flex items-center bg-slate-100 border border-slate-200 rounded-lg p-0.5">
-                                {(
-                                  [
-                                    { size: 'compact', label: 'C' },
-                                    { size: 'medium', label: 'M' },
-                                    { size: 'large', label: 'L' },
-                                    { size: 'featured', label: 'Hero' },
-                                  ] as const
-                                ).map((s) => (
-                                  <button
-                                    key={s.size}
-                                    onClick={() => handleQuickSizeChange(menu.id, s.size)}
-                                    className={`px-2.5 py-1 text-[11px] font-bold rounded-md transition-all ${
-                                      menu.size === s.size
-                                        ? 'bg-white text-indigo-600 shadow-xs font-black border border-slate-200'
-                                        : 'text-slate-500 hover:text-slate-900'
-                                    }`}
-                                  >
-                                    {s.label}
-                                  </button>
-                                ))}
-                              </div>
-
-                              {/* Up / Down Reorder */}
-                              <div className="flex items-center gap-1">
-                                <button
-                                  onClick={() => handleMove(index, 'up')}
-                                  disabled={index === 0}
-                                  title="Pindah ke Atas"
-                                  className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 disabled:opacity-30 rounded-lg border border-slate-200 active:bg-slate-300"
-                                >
-                                  <ArrowUp className="w-3.5 h-3.5" />
-                                </button>
-                                <button
-                                  onClick={() => handleMove(index, 'down')}
-                                  disabled={index === menus.length - 1}
-                                  title="Pindah ke Bawah"
-                                  className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 disabled:opacity-30 rounded-lg border border-slate-200 active:bg-slate-300"
-                                >
-                                  <ArrowDown className="w-3.5 h-3.5" />
-                                </button>
-                              </div>
-                            </div>
-
-                            {/* Row 2: Status Toggle + Edit / Duplicate / Delete */}
-                            <div className="flex items-center justify-between gap-2 pt-1">
-                              {/* Status Toggle with Text */}
-                              <button
-                                onClick={() => handleToggleActive(menu.id)}
-                                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition-colors ${
-                                  menu.isActive
-                                    ? 'bg-green-50 text-green-700 border-green-200'
-                                    : 'bg-slate-100 text-slate-500 border-slate-200'
-                                }`}
-                              >
-                                {menu.isActive ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
-                                <span>{menu.isActive ? 'Aktif' : 'Nonaktif'}</span>
-                              </button>
-
-                              {/* Action Buttons Group */}
-                              <div className="flex items-center gap-1.5">
-                                <button
-                                  onClick={() => handleEditMenu(menu)}
-                                  className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-semibold transition-colors"
-                                >
-                                  <Edit2 className="w-3.5 h-3.5" />
-                                  <span>Edit</span>
-                                </button>
-                                <button
-                                  onClick={() => handleDuplicateMenu(menu)}
-                                  title="Duplikat Menu"
-                                  className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 transition-colors"
-                                >
-                                  <Copy className="w-3.5 h-3.5" />
-                                </button>
-                                <button
-                                  onClick={() => handleDeleteMenu(menu.id)}
-                                  title="Hapus Menu"
-                                  className="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 transition-colors"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
-                              </div>
                             </div>
                           </div>
                         </div>
@@ -2783,36 +2560,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           >
             <Check className="w-4 h-4 text-emerald-400" />
             <span>Perubahan tersimpan otomatis!</span>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Floating Bottom Quick Action Bar for Instant Posting */}
-      <AnimatePresence>
-        {hasUnpublishedChanges && onPublish && (
-          <motion.div
-            initial={{ opacity: 0, y: 50, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 50, scale: 0.95 }}
-            className="fixed bottom-5 left-1/2 -translate-x-1/2 z-40 px-4 py-3 bg-slate-950/95 text-white rounded-2xl shadow-2xl border border-emerald-500/50 flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 max-w-[95vw] sm:max-w-2xl backdrop-blur-md"
-          >
-            <div className="flex items-center gap-2.5 min-w-0">
-              <span className="w-3 h-3 rounded-full bg-amber-400 animate-ping shrink-0" />
-              <div className="flex flex-col min-w-0">
-                <span className="text-xs font-bold text-white truncate">Perubahan Siap Diposting ke Pegawai</span>
-                <span className="text-[10px] text-amber-300 truncate">Semua HP, Laptop, dan Tablet pegawai akan otomatis terupdate seketika</span>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <button
-                onClick={onPublish}
-                disabled={isPublishing}
-                className="px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-white text-xs font-black rounded-xl shadow-lg shadow-emerald-500/30 transition-all flex items-center gap-1.5 hover:scale-105 active:scale-95"
-              >
-                <Zap className={`w-3.5 h-3.5 ${isPublishing ? 'animate-spin' : ''}`} />
-                <span>{isPublishing ? 'Memposting...' : '🚀 Posting ke Seluruh Device'}</span>
-              </button>
-            </div>
           </motion.div>
         )}
       </AnimatePresence>
