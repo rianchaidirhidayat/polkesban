@@ -464,7 +464,7 @@ export const WfaMonitoringView: React.FC<WfaMonitoringViewProps> = ({
           }`}
         >
           <Users className="w-4 h-4 text-indigo-600" />
-          <span>Kelola Master Pegawai (Tambah / Edit / Hapus)</span>
+          <span>Kelola Master Pegawai</span>
           <span
             className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
               monitorTab === 'employees' ? 'bg-indigo-100 text-indigo-800' : 'bg-slate-200 text-slate-700'
