@@ -149,8 +149,8 @@ export const EmployeeManagerView: React.FC = () => {
     setFormError(null);
 
     const cleanNip = formNip.replace(/[\s.-]/g, '').trim();
-    if (!cleanNip || cleanNip.length < 9) {
-      setFormError('Nomor NIP wajib diisi minimal 9 karakter numeric!');
+    if (!cleanNip || cleanNip.length < 3) {
+      setFormError('Nomor NIP / NIK / ID Pegawai Non-ASN wajib diisi minimal 3 karakter!');
       return;
     }
     if (!formName.trim()) {
@@ -589,18 +589,18 @@ export const EmployeeManagerView: React.FC = () => {
 
                 <div>
                   <label className="text-xs font-bold text-slate-700 block mb-1">
-                    Nomor NIP Pegawai <span className="text-rose-500">*</span>
+                    Nomor NIP / NIK / ID Non-ASN <span className="text-rose-500">*</span>
                   </label>
                   <input
                     type="text"
                     required
-                    placeholder="Contoh: 198501012010121001"
+                    placeholder="Contoh: 19850101... atau 3204... (NIK/ID)"
                     value={formNip}
                     onChange={(e) => setFormNip(e.target.value)}
                     className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-slate-900 font-mono text-xs sm:text-sm focus:outline-none focus:border-emerald-500"
                   />
                   <p className="text-[11px] text-slate-400 mt-1">
-                    Gunakan 18 digit NIP resmi Kemenkes tanpa spasi atau tanda baca.
+                    Untuk ASN gunakan 18 digit NIP resmi. Untuk Non-ASN dapat diisi 16 digit NIK (KTP) atau Nomor Kontrak / ID Pegawai.
                   </p>
                 </div>
 
@@ -757,7 +757,7 @@ export const EmployeeManagerView: React.FC = () => {
 
                 <div>
                   <label className="text-xs font-bold text-slate-500 block mb-1">
-                    Nomor NIP Pegawai (Tidak Dapat Diubah)
+                    Nomor NIP / NIK / ID Pegawai (Tidak Dapat Diubah)
                   </label>
                   <input
                     type="text"

@@ -50,6 +50,7 @@ import {
   Share2,
   RefreshCw,
   Activity,
+  Users,
 } from 'lucide-react';
 import { MenuItem, MicrositeProfile, ClickLog, ButtonSize, ThemeConfig, WfaSubmission, WfaValidationStatus, KebugaranSubmission } from '../types';
 import { THEME_PRESETS, CATEGORIES_PRESET } from '../data/initialData';
@@ -58,6 +59,7 @@ import { AdminMenuEditorModal } from './AdminMenuEditorModal';
 import { AnalyticsView } from './AnalyticsView';
 import { WfaMonitoringView } from './WfaMonitoringView';
 import { KebugaranMonitoringView } from './KebugaranMonitoringView';
+import { EmployeeManagerView } from './EmployeeManagerView';
 import { PublicMicrosite } from './PublicMicrosite';
 import { exportToCSV, exportToPDF } from '../utils/exportUtils';
 import { optimizeImageForStorage } from '../utils/imageOptimizer';
@@ -119,7 +121,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   onRefreshKebugaran,
   onOpenKebugaranModal,
 }) => {
-  const [activeTab, setActiveTab] = useState<'menus' | 'theme' | 'analytics' | 'wfa_monitoring' | 'kebugaran_monitoring' | 'export' | 'security'>('menus');
+  const [activeTab, setActiveTab] = useState<'menus' | 'theme' | 'employees' | 'analytics' | 'wfa_monitoring' | 'kebugaran_monitoring' | 'export' | 'security'>('menus');
   const [editingMenu, setEditingMenu] = useState<MenuItem | null>(null);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [showLiveSidePreview, setShowLiveSidePreview] = useState(true);
@@ -350,6 +352,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           >
             <Palette className="w-3.5 h-3.5" />
             <span>Tema & Profil</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('employees')}
+            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-md text-xs font-medium transition-all ${
+              activeTab === 'employees'
+                ? 'bg-indigo-600 text-white shadow-xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/70'
+            }`}
+          >
+            <Users className="w-3.5 h-3.5" />
+            <span>Database Pegawai</span>
           </button>
 
           <button
@@ -2154,6 +2168,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   triggerSaveFeedback();
                 }}
               />
+            )}
+
+            {/* TAB: DATABASE MASTER PEGAWAI (ASN & NON ASN) */}
+            {activeTab === 'employees' && (
+              <EmployeeManagerView />
             )}
 
             {/* TAB 4: EKSPOR LAPORAN */}
