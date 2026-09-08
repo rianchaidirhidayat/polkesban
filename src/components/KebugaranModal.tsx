@@ -27,7 +27,6 @@ import { findEmployeeByNip, searchEmployees, getActiveEmployees } from '../data/
 import {
   extractBirthDateFromNip,
   formatTanggalIndo,
-  generateOrGetNik,
   calculateBmi,
   classifyBloodPressure,
   classifyBloodSugar,
@@ -74,17 +73,17 @@ export const KebugaranModal: React.FC<KebugaranModalProps> = ({
   const [unitKerja, setUnitKerja] = useState('');
   const [nik, setNik] = useState('');
 
-  // Vital & Physical Signs
-  const [tensiSistolik, setTensiSistolik] = useState<number | ''>(120);
-  const [tensiDiastolik, setTensiDiastolik] = useState<number | ''>(80);
-  const [beratBadan, setBeratBadan] = useState<number | ''>(65);
-  const [tinggiBadan, setTinggiBadan] = useState<number | ''>(165);
-  const [lingkarPinggang, setLingkarPinggang] = useState<number | ''>(78);
+  // Vital & Physical Signs (blank state ready for employee input)
+  const [tensiSistolik, setTensiSistolik] = useState<number | ''>('');
+  const [tensiDiastolik, setTensiDiastolik] = useState<number | ''>('');
+  const [beratBadan, setBeratBadan] = useState<number | ''>('');
+  const [tinggiBadan, setTinggiBadan] = useState<number | ''>('');
+  const [lingkarPinggang, setLingkarPinggang] = useState<number | ''>('');
 
-  // Lab Results
+  // Lab Results (blank state ready for employee input)
   const [tipeGulaDarah, setTipeGulaDarah] = useState<GulaDarahType>('GDS');
-  const [gulaDarah, setGulaDarah] = useState<number | ''>(110);
-  const [kolesterol, setKolesterol] = useState<number | ''>(185);
+  const [gulaDarah, setGulaDarah] = useState<number | ''>('');
+  const [kolesterol, setKolesterol] = useState<number | ''>('');
 
   // Contact & Facility
   const [nomorWa, setNomorWa] = useState('');
@@ -97,6 +96,7 @@ export const KebugaranModal: React.FC<KebugaranModalProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [submittedData, setSubmittedData] = useState<KebugaranSubmission | null>(null);
+  const [hasImgError, setHasImgError] = useState(false);
 
   // Suggestions for NIP search
   const employeeSuggestions = useMemo(() => {
@@ -104,7 +104,7 @@ export const KebugaranModal: React.FC<KebugaranModalProps> = ({
     return searchEmployees(nipSearchKeyword).slice(0, 6);
   }, [nipSearchKeyword]);
 
-  // Handle NIP changes & auto-filling
+  // Handle NIP changes & auto-filling (NIK is manual, not auto-filled)
   const handleNipInput = (rawVal: string) => {
     setNip(rawVal);
     setNipSearchKeyword(rawVal);
@@ -122,9 +122,7 @@ export const KebugaranModal: React.FC<KebugaranModalProps> = ({
         const bdate = found.tanggalLahir || extractBirthDateFromNip(clean);
         if (bdate) setTanggalLahir(bdate);
         
-        // Auto-extract or generate NIK
-        const generatedNik = generateOrGetNik(clean, found.nik);
-        if (generatedNik) setNik(generatedNik);
+        // Note: NIK is left manual for the employee to fill per instructions
 
         setIsEmployeeFound(true);
       } else {
@@ -134,16 +132,13 @@ export const KebugaranModal: React.FC<KebugaranModalProps> = ({
         if (extractedDate && !tanggalLahir) {
           setTanggalLahir(extractedDate);
         }
-        if (!nik && clean.length >= 8) {
-          setNik(generateOrGetNik(clean));
-        }
       }
     } else {
       setIsEmployeeFound(false);
     }
   };
 
-  // Select employee from autocomplete
+  // Select employee from autocomplete (NIK is manual, not auto-filled)
   const handleSelectEmployee = (emp: EmployeeRecord) => {
     setNip(emp.nip);
     setNamaPegawai(emp.name);
@@ -153,8 +148,7 @@ export const KebugaranModal: React.FC<KebugaranModalProps> = ({
     const bdate = emp.tanggalLahir || extractBirthDateFromNip(emp.nip);
     if (bdate) setTanggalLahir(bdate);
 
-    const generatedNik = generateOrGetNik(emp.nip, emp.nik);
-    if (generatedNik) setNik(generatedNik);
+    // Note: NIK is left manual for the employee to fill per instructions
 
     setIsEmployeeFound(true);
     setShowNipSuggestions(false);
@@ -178,7 +172,7 @@ export const KebugaranModal: React.FC<KebugaranModalProps> = ({
     return classifyCholesterol(Number(kolesterol) || 0);
   }, [kolesterol]);
 
-  // Reset form
+  // Reset form (leaves all health fields and NIK blank)
   const handleResetForm = () => {
     setTanggalPeriksa(todayStr);
     setPeriode(currentQuarter);
@@ -187,14 +181,14 @@ export const KebugaranModal: React.FC<KebugaranModalProps> = ({
     setTanggalLahir('');
     setUnitKerja('');
     setNik('');
-    setTensiSistolik(120);
-    setTensiDiastolik(80);
-    setBeratBadan(65);
-    setTinggiBadan(165);
-    setLingkarPinggang(78);
+    setTensiSistolik('');
+    setTensiDiastolik('');
+    setBeratBadan('');
+    setTinggiBadan('');
+    setLingkarPinggang('');
     setTipeGulaDarah('GDS');
-    setGulaDarah(110);
-    setKolesterol(185);
+    setGulaDarah('');
+    setKolesterol('');
     setNomorWa('');
     setFasyankes('Klinik Pratama Poltekkes Kemenkes Bandung');
     setIsEmployeeFound(false);
@@ -222,6 +216,10 @@ export const KebugaranModal: React.FC<KebugaranModalProps> = ({
     }
     if (!unitKerja.trim()) {
       setErrorMessage('Unit kerja / jurusan wajib diisi!');
+      return;
+    }
+    if (!nik.trim() || nik.trim().length < 10) {
+      setErrorMessage('NIK (Nomor Induk Kependudukan 16 digit) wajib diisi manual!');
       return;
     }
     if (!tensiSistolik || !tensiDiastolik) {
@@ -262,7 +260,7 @@ export const KebugaranModal: React.FC<KebugaranModalProps> = ({
         namaPegawai: namaPegawai.trim(),
         tanggalLahir: tanggalLahir.trim(),
         unitKerja: unitKerja.trim(),
-        nik: nik.trim() || generateOrGetNik(nip),
+        nik: nik.trim(),
         tensiSistolik: Number(tensiSistolik),
         tensiDiastolik: Number(tensiDiastolik),
         beratBadan: Number(beratBadan),
@@ -304,21 +302,32 @@ export const KebugaranModal: React.FC<KebugaranModalProps> = ({
         transition={{ duration: 0.2 }}
         className="relative w-full max-w-3xl bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden my-auto max-h-[92vh] flex flex-col"
       >
-        {/* Modal Floating Header */}
-        <div className="relative px-6 py-5 bg-gradient-to-r from-sky-600 via-blue-600 to-indigo-700 text-white flex items-center justify-between shadow-md shrink-0">
-          <div className="flex items-center gap-3.5">
-            <div className="w-11 h-11 rounded-2xl bg-white/15 border border-white/25 flex items-center justify-center shadow-inner shrink-0 backdrop-blur-xs">
-              <Activity className="w-6 h-6 text-white" />
+        {/* Modal Header with Institutional Poltekkes Kemenkes Bandung Logo */}
+        <div className="relative px-5 sm:px-7 py-4 bg-gradient-to-r from-sky-700 via-blue-600 to-indigo-700 text-white flex items-center justify-between shadow-md shrink-0">
+          <div className="flex items-center gap-3 sm:gap-4">
+            {/* Logo Poltekkes Kemenkes Bandung */}
+            <div className="bg-white px-3.5 py-1.5 rounded-xl border border-white/30 shadow-md shrink-0 flex items-center justify-center">
+              {!hasImgError && logoUrl ? (
+                <img
+                  src={logoUrl}
+                  alt="Logo Poltekkes Kemenkes Bandung"
+                  className="h-8 sm:h-9 w-auto max-w-[170px] sm:max-w-[210px] object-contain"
+                  referrerPolicy="no-referrer"
+                  onError={() => setHasImgError(true)}
+                />
+              ) : (
+                <div className="flex items-center gap-1.5 text-blue-950 font-bold text-xs tracking-tight">
+                  <span className="w-2.5 h-2.5 rounded-full bg-blue-600" />
+                  <span>POLTEKKES KEMENKES BANDUNG</span>
+                </div>
+              )}
             </div>
+
             <div>
-              <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-white/20 text-white text-[11px] font-bold tracking-wide uppercase mb-1">
-                <Sparkles className="w-3 h-3 text-sky-200" />
-                <span>Formulir Melayang Resmi OSDM</span>
-              </div>
-              <h2 className="text-lg sm:text-xl font-black tracking-tight text-white">
+              <h2 className="text-base sm:text-lg font-black tracking-tight text-white leading-tight">
                 Formulir Input Data Kebugaran
               </h2>
-              <p className="text-xs text-sky-100/90 hidden sm:block">
+              <p className="text-[11px] sm:text-xs text-sky-100/90 hidden sm:block">
                 Pencatatan data kesehatan berkala pegawai Poltekkes Kemenkes Bandung
               </p>
             </div>
@@ -509,7 +518,7 @@ export const KebugaranModal: React.FC<KebugaranModalProps> = ({
                     </div>
                   </div>
                   <p className="text-[10px] text-slate-400 mt-1">
-                    Cukup ketik NIP, nama pegawai, tanggal lahir, unit kerja, dan NIK akan langsung terisi otomatis.
+                    Ketik NIP untuk memuat nama, tanggal lahir, dan unit kerja pegawai secara otomatis.
                   </p>
 
                   {/* Autocomplete Dropdown */}
@@ -594,16 +603,21 @@ export const KebugaranModal: React.FC<KebugaranModalProps> = ({
                     />
                   </div>
 
-                  {/* NIK (Nomor Induk Kependudukan 16 Digit) */}
+                  {/* NIK (Nomor Induk Kependudukan 16 Digit) - Diisi Manual */}
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                      NIK (Nomor Induk Kependudukan) <span className="text-rose-500">*</span>
-                    </label>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="block text-xs font-bold text-slate-700">
+                        NIK (Nomor Induk Kependudukan) <span className="text-rose-500">*</span>
+                      </label>
+                      <span className="text-[10px] text-slate-500 font-medium bg-slate-100 px-2 py-0.5 rounded">
+                        Diisi manual
+                      </span>
+                    </div>
                     <input
                       type="text"
                       required
                       maxLength={16}
-                      placeholder="16 digit NIK..."
+                      placeholder="Masukkan 16 digit NIK (KTP)..."
                       value={nik}
                       onChange={(e) => setNik(e.target.value.replace(/[^0-9]/g, ''))}
                       className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all"
@@ -641,7 +655,7 @@ export const KebugaranModal: React.FC<KebugaranModalProps> = ({
                           required
                           min={60}
                           max={260}
-                          placeholder="120"
+                          placeholder="Contoh: 120"
                           value={tensiSistolik}
                           onChange={(e) => setTensiSistolik(e.target.value === '' ? '' : Number(e.target.value))}
                           className="w-full pl-3 pr-14 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
@@ -660,7 +674,7 @@ export const KebugaranModal: React.FC<KebugaranModalProps> = ({
                           required
                           min={40}
                           max={160}
-                          placeholder="80"
+                          placeholder="Contoh: 80"
                           value={tensiDiastolik}
                           onChange={(e) => setTensiDiastolik(e.target.value === '' ? '' : Number(e.target.value))}
                           className="w-full pl-3 pr-14 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
@@ -688,7 +702,7 @@ export const KebugaranModal: React.FC<KebugaranModalProps> = ({
                       step="0.1"
                       min={25}
                       max={220}
-                      placeholder="65"
+                      placeholder="Contoh: 65"
                       value={beratBadan}
                       onChange={(e) => setBeratBadan(e.target.value === '' ? '' : Number(e.target.value))}
                       className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
@@ -706,7 +720,7 @@ export const KebugaranModal: React.FC<KebugaranModalProps> = ({
                       required
                       min={100}
                       max={220}
-                      placeholder="165"
+                      placeholder="Contoh: 165"
                       value={tinggiBadan}
                       onChange={(e) => setTinggiBadan(e.target.value === '' ? '' : Number(e.target.value))}
                       className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
@@ -723,7 +737,7 @@ export const KebugaranModal: React.FC<KebugaranModalProps> = ({
                       required
                       min={40}
                       max={180}
-                      placeholder="78"
+                      placeholder="Contoh: 78"
                       value={lingkarPinggang}
                       onChange={(e) => setLingkarPinggang(e.target.value === '' ? '' : Number(e.target.value))}
                       className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
@@ -798,7 +812,7 @@ export const KebugaranModal: React.FC<KebugaranModalProps> = ({
                         required
                         min={40}
                         max={600}
-                        placeholder="110"
+                        placeholder="Contoh: 110"
                         value={gulaDarah}
                         onChange={(e) => setGulaDarah(e.target.value === '' ? '' : Number(e.target.value))}
                         className="w-full pl-3 pr-16 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
@@ -832,7 +846,7 @@ export const KebugaranModal: React.FC<KebugaranModalProps> = ({
                         required
                         min={70}
                         max={500}
-                        placeholder="185"
+                        placeholder="Contoh: 185"
                         value={kolesterol}
                         onChange={(e) => setKolesterol(e.target.value === '' ? '' : Number(e.target.value))}
                         className="w-full pl-3 pr-16 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
