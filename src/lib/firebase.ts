@@ -410,6 +410,24 @@ export function subscribeToWfaSubmissions(
   }
 }
 
+function withTimeout<T>(promise: Promise<T>, ms = 5000): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error('Koneksi database cloud timeout'));
+    }, ms);
+    promise.then(
+      (res) => {
+        clearTimeout(timer);
+        resolve(res);
+      },
+      (err) => {
+        clearTimeout(timer);
+        reject(err);
+      }
+    );
+  });
+}
+
 /**
  * Submit a new WFA Bimbingan application to Cloud Firestore
  */
@@ -427,7 +445,7 @@ export async function createWfaSubmissionInCloud(
       serverTimestamp: serverTimestamp(),
     });
 
-    const docAdded = await addDoc(colRef, payload);
+    const docAdded = await withTimeout(addDoc(colRef, payload), 5000);
 
     const fullSubmission: WfaSubmission = {
       id: docAdded.id,
@@ -438,7 +456,7 @@ export async function createWfaSubmissionInCloud(
 
     return { success: true, submission: fullSubmission };
   } catch (err: any) {
-    console.error('Failed to create WFA submission in Cloud Firestore:', err);
+    console.warn('Failed to create WFA submission in Cloud Firestore (using local fallback):', err);
     return {
       success: false,
       error: err?.message || 'Gagal menyimpan pengajuan ke database server.',
@@ -584,7 +602,7 @@ export async function createKebugaranSubmissionInCloud(
       serverTimestamp: serverTimestamp(),
     });
 
-    const docAdded = await addDoc(colRef, payload);
+    const docAdded = await withTimeout(addDoc(colRef, payload), 5000);
 
     const fullSubmission: KebugaranSubmission = {
       id: docAdded.id,
