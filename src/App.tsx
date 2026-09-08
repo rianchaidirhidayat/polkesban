@@ -641,17 +641,24 @@ export default function App() {
   const handleCreateKebugaranSubmission = async (data: Omit<KebugaranSubmission, 'id' | 'createdAt'>) => {
     // Duplicate rejection: Pegawai tidak boleh mengisi formulir kebugaran pada periode yang sama dua kali
     const cleanNip = data.nip.replace(/[\s.-]/g, '').trim();
+    const cleanNik = data.nik ? data.nik.replace(/[\s.-]/g, '').trim() : '';
     const cleanPeriode = data.periode.trim();
 
     const isDuplicate = kebugaranSubmissions.some((sub) => {
-      const subNip = sub.nip.replace(/[\s.-]/g, '').trim();
-      return subNip === cleanNip && sub.periode.toLowerCase() === cleanPeriode.toLowerCase();
+      const subNip = sub.nip ? sub.nip.replace(/[\s.-]/g, '').trim() : '';
+      const subNik = sub.nik ? sub.nik.replace(/[\s.-]/g, '').trim() : '';
+      const samePeriode = sub.periode.toLowerCase() === cleanPeriode.toLowerCase();
+
+      const nipMatch = cleanNip && subNip && subNip === cleanNip;
+      const nikMatch = cleanNik && subNik && subNik === cleanNik;
+
+      return samePeriode && (nipMatch || nikMatch);
     });
 
     if (isDuplicate) {
       return {
         success: false,
-        error: `Data Ditolak: Pegawai dengan NIP ${data.nip} (${data.namaPegawai}) sudah terdaftar mengisi formulir data kebugaran untuk ${data.periode}. Setiap pegawai hanya mengisi 1 kali per periode triwulan.`,
+        error: `Penginputan Ditolak: Pegawai atas nama ${data.namaPegawai} (NIP: ${data.nip}) sudah terdata pada ${data.periode}. Sistem secara otomatis menolak pengisian ganda (duplikat) dalam satu periode triwulan yang sama.`,
       };
     }
 
