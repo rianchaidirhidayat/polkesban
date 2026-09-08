@@ -1,4 +1,8 @@
 import { EmployeeRecord, WfaSubmission } from '../types';
+import {
+  saveEmployeeDeltaToCloud,
+  subscribeToEmployeeDelta,
+} from '../lib/firebase';
 
 /**
  * Pangkalan Data Pegawai Poltekkes Kemenkes Bandung
@@ -2943,16 +2947,66 @@ export function loadEmployeeDelta(): EmployeeDelta {
   return { added: [], updated: {}, deleted: [] };
 }
 
-// Save delta to localStorage and broadcast
+// Save delta to localStorage, broadcast, and sync to Cloud Firestore
 export function saveEmployeeDelta(delta: EmployeeDelta) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(delta));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('poltekkes_employees_updated', { detail: delta }));
+    }
     if (typeof BroadcastChannel !== 'undefined') {
       const bc = new BroadcastChannel(SYNC_CHANNEL_NAME);
       bc.postMessage({ type: 'EMPLOYEE_SYNC' });
       bc.close();
     }
   } catch {}
+
+  // Asynchronously sync to Cloud Firestore for instant cross-device updates (PC & Handphone)
+  saveEmployeeDeltaToCloud(delta).catch((err) => {
+    console.warn('Employee cloud sync error:', err);
+  });
+}
+
+// Apply delta received from Cloud Firestore
+export function applyCloudEmployeeDelta(delta: EmployeeDelta) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(delta));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('poltekkes_employees_updated', { detail: delta }));
+    }
+    if (typeof BroadcastChannel !== 'undefined') {
+      const bc = new BroadcastChannel(SYNC_CHANNEL_NAME);
+      bc.postMessage({ type: 'EMPLOYEE_SYNC' });
+      bc.close();
+    }
+  } catch {}
+}
+
+let isCloudDeltaSubscriptionActive = false;
+
+/**
+ * Initialize real-time Cloud listener for Employee database additions/edits
+ */
+export function initEmployeeCloudSync() {
+  if (isCloudDeltaSubscriptionActive || typeof window === 'undefined') return;
+  isCloudDeltaSubscriptionActive = true;
+
+  try {
+    subscribeToEmployeeDelta((cloudDelta) => {
+      if (cloudDelta) {
+        applyCloudEmployeeDelta(cloudDelta);
+      }
+    });
+  } catch (e) {
+    console.warn('Failed to start employee cloud delta subscription:', e);
+  }
+}
+
+// Automatically initialize in browser
+if (typeof window !== 'undefined') {
+  setTimeout(() => {
+    initEmployeeCloudSync();
+  }, 100);
 }
 
 // Get effective combined list of employees
@@ -3077,6 +3131,7 @@ export function resetEmployeeToDefault() {
 export function subscribeEmployeeChanges(callback: () => void): () => void {
   const handler = () => callback();
   window.addEventListener('storage', handler);
+  window.addEventListener('poltekkes_employees_updated', handler);
   let bc: BroadcastChannel | null = null;
   if (typeof BroadcastChannel !== 'undefined') {
     try {
@@ -3086,6 +3141,7 @@ export function subscribeEmployeeChanges(callback: () => void): () => void {
   }
   return () => {
     window.removeEventListener('storage', handler);
+    window.removeEventListener('poltekkes_employees_updated', handler);
     if (bc) bc.close();
   };
 }

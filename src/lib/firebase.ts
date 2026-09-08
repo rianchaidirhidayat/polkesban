@@ -18,7 +18,7 @@ import {
   Firestore
 } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
-import { MenuItem, MicrositeProfile, ClickLog, WfaSubmission, WfaValidationStatus, KebugaranSubmission } from '../types';
+import { MenuItem, MicrositeProfile, ClickLog, WfaSubmission, WfaValidationStatus, KebugaranSubmission, EmployeeRecord } from '../types';
 import { INITIAL_MENUS, INITIAL_PROFILE, INITIAL_CLICK_LOGS } from '../data/initialData';
 import { INITIAL_WFA_SUBMISSIONS } from '../data/employeeDatabase';
 import { INITIAL_KEBUGARAN_SUBMISSIONS } from '../data/kebugaranInitialData';
@@ -225,7 +225,7 @@ export async function saveAdminPinToCloud(newPin: string): Promise<boolean> {
  * Subscribe to Admin Draft in Cloud Firestore so any admin edits are synced across devices
  */
 export function subscribeToAdminDraft(
-  onDraftUpdate: (data: { menus: MenuItem[]; profile: MicrositeProfile }) => void,
+  onDraftUpdate: (data: { menus: MenuItem[]; profile: MicrositeProfile; updatedAt?: any }) => void,
   onError?: (error: any) => void
 ) {
   const docRef = doc(db, 'settings', DRAFT_DOC);
@@ -239,6 +239,7 @@ export function subscribeToAdminDraft(
           onDraftUpdate({
             menus: data.menus,
             profile: data.profile,
+            updatedAt: data.updatedAt,
           });
         }
       }
@@ -248,6 +249,121 @@ export function subscribeToAdminDraft(
       if (onError) onError(err);
     }
   );
+}
+
+/**
+ * Fetch Admin Draft once directly from Cloud Firestore
+ */
+export async function getAdminDraftOnce(): Promise<{ menus: MenuItem[]; profile: MicrositeProfile } | null> {
+  try {
+    const docRef = doc(db, 'settings', DRAFT_DOC);
+    const snap = await getDoc(docRef);
+    if (snap.exists()) {
+      const data = snap.data();
+      if (data && Array.isArray(data.menus) && data.profile) {
+        return {
+          menus: data.menus,
+          profile: data.profile,
+        };
+      }
+    }
+  } catch (e) {
+    console.warn('Failed to fetch draft doc once:', e);
+  }
+  return null;
+}
+
+const EMPLOYEE_DELTA_DOC = 'employee_delta';
+
+export interface EmployeeDelta {
+  added: EmployeeRecord[];
+  updated: Record<string, Partial<EmployeeRecord>>;
+  deleted: string[];
+  updatedAt?: any;
+}
+
+/**
+ * Subscribe to Employee Database Delta changes in Cloud Firestore (for instant real-time sync across HP & PC)
+ */
+export function subscribeToEmployeeDelta(
+  onUpdate: (delta: EmployeeDelta) => void,
+  onError?: (err: any) => void
+) {
+  try {
+    const docRef = doc(db, 'settings', EMPLOYEE_DELTA_DOC);
+    return onSnapshot(
+      docRef,
+      (snapshot) => {
+        if (snapshot.exists()) {
+          const data = snapshot.data();
+          if (data) {
+            onUpdate({
+              added: Array.isArray(data.added) ? data.added : [],
+              updated: data.updated && typeof data.updated === 'object' ? data.updated : {},
+              deleted: Array.isArray(data.deleted) ? data.deleted : [],
+              updatedAt: data.updatedAt,
+            });
+          }
+        }
+      },
+      (err) => {
+        console.warn('Firestore employee_delta subscription error:', err);
+        if (onError) onError(err);
+      }
+    );
+  } catch (e) {
+    console.warn('Failed to initialize employee_delta subscription:', e);
+    return () => {};
+  }
+}
+
+/**
+ * Save Employee Database Delta to Cloud Firestore
+ */
+export async function saveEmployeeDeltaToCloud(delta: EmployeeDelta): Promise<boolean> {
+  try {
+    const docRef = doc(db, 'settings', EMPLOYEE_DELTA_DOC);
+    const sanitizedAdded = (delta.added || []).map((emp) => sanitizeForFirestore(emp));
+    const sanitizedUpdated: Record<string, any> = {};
+    for (const [k, v] of Object.entries(delta.updated || {})) {
+      sanitizedUpdated[k] = sanitizeForFirestore(v);
+    }
+
+    await setDoc(docRef, {
+      added: sanitizedAdded,
+      updated: sanitizedUpdated,
+      deleted: delta.deleted || [],
+      updatedAt: serverTimestamp(),
+    });
+    return true;
+  } catch (e) {
+    console.warn('Failed to save employee delta to Cloud Firestore:', e);
+    return false;
+  }
+}
+
+/**
+ * Fetch Employee Database Delta once directly from Cloud Firestore
+ */
+export async function getEmployeeDeltaOnce(): Promise<EmployeeDelta | null> {
+  try {
+    const docRef = doc(db, 'settings', EMPLOYEE_DELTA_DOC);
+    const snap = await getDoc(docRef);
+    if (snap.exists()) {
+      const data = snap.data();
+      if (data) {
+        return {
+          added: Array.isArray(data.added) ? data.added : [],
+          updated: data.updated && typeof data.updated === 'object' ? data.updated : {},
+          deleted: Array.isArray(data.deleted) ? data.deleted : [],
+          updatedAt: data.updatedAt,
+        };
+      }
+    }
+  } catch (e) {
+    console.warn('Failed to fetch employee delta once:', e);
+  }
+  return null;
 }
 
 /**

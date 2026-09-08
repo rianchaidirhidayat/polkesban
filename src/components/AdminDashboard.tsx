@@ -91,6 +91,8 @@ interface AdminDashboardProps {
   onDeleteKebugaranSubmission?: (id: string) => Promise<{ success: boolean; error?: string }>;
   onRefreshKebugaran?: () => void;
   onOpenKebugaranModal?: () => void;
+  onForceSyncCloud?: () => Promise<any>;
+  isForceSyncing?: boolean;
 }
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({
@@ -120,6 +122,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   onDeleteKebugaranSubmission,
   onRefreshKebugaran,
   onOpenKebugaranModal,
+  onForceSyncCloud,
+  isForceSyncing = false,
 }) => {
   const [activeTab, setActiveTab] = useState<'menus' | 'theme' | 'employees' | 'analytics' | 'wfa_monitoring' | 'kebugaran_monitoring' | 'export' | 'security'>('menus');
   const [editingMenu, setEditingMenu] = useState<MenuItem | null>(null);
@@ -327,143 +331,206 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   return (
     <div className="w-full min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans">
       {/* Top Admin Sub-Header Navigation */}
-      <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-200 px-4 sm:px-8 py-3 flex flex-wrap items-center justify-between gap-3 shadow-xs">
-        {/* Navigation Tabs */}
-        <div className="flex items-center gap-1.5 p-1 bg-slate-100 border border-slate-200 rounded-lg">
-          <button
-            onClick={() => setActiveTab('menus')}
-            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-md text-xs font-medium transition-all ${
-              activeTab === 'menus'
-                ? 'bg-indigo-600 text-white shadow-xs'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/70'
-            }`}
-          >
-            <LayoutGrid className="w-3.5 h-3.5" />
-            <span>Kelola Menu ({menus.length})</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('theme')}
-            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-md text-xs font-medium transition-all ${
-              activeTab === 'theme'
-                ? 'bg-indigo-600 text-white shadow-xs'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/70'
-            }`}
-          >
-            <Palette className="w-3.5 h-3.5" />
-            <span>Tema & Profil</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('employees')}
-            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-md text-xs font-medium transition-all ${
-              activeTab === 'employees'
-                ? 'bg-indigo-600 text-white shadow-xs'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/70'
-            }`}
-          >
-            <Users className="w-3.5 h-3.5" />
-            <span>Database Pegawai</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('analytics')}
-            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-md text-xs font-medium transition-all ${
-              activeTab === 'analytics'
-                ? 'bg-indigo-600 text-white shadow-xs'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/70'
-            }`}
-          >
-            <BarChart3 className="w-3.5 h-3.5" />
-            <span>Analitik Klik</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('wfa_monitoring')}
-            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-md text-xs font-medium transition-all relative ${
-              activeTab === 'wfa_monitoring'
-                ? 'bg-emerald-600 text-white shadow-xs'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/70'
-            }`}
-          >
-            <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Monitoring WFA</span>
-            {wfaSubmissions.filter(s => s.status === 'Menunggu Validasi').length > 0 && (
-              <span className="px-1.5 py-0.2 rounded-full bg-amber-500 text-slate-950 font-black text-[10px] animate-pulse">
-                {wfaSubmissions.filter(s => s.status === 'Menunggu Validasi').length}
+      <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-200 px-3 sm:px-8 py-2 sm:py-3 shadow-xs">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2.5">
+          {/* Mobile Top Action Bar: Tab indicator + Quick Actions (Add Menu / Sync / Preview) */}
+          <div className="flex items-center justify-between gap-2 md:hidden">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span className="w-2 h-2 rounded-full bg-indigo-600 animate-pulse shrink-0" />
+              <span className="text-xs font-bold text-slate-800 truncate">
+                {activeTab === 'menus' && `Kelola Menu (${menus.length})`}
+                {activeTab === 'theme' && 'Tema & Profil'}
+                {activeTab === 'employees' && 'Database Pegawai'}
+                {activeTab === 'analytics' && 'Analitik Klik'}
+                {activeTab === 'wfa_monitoring' && 'Monitoring WFA'}
+                {activeTab === 'kebugaran_monitoring' && 'Monitoring Kebugaran'}
+                {activeTab === 'export' && 'Ekspor Data'}
+                {activeTab === 'security' && 'Keamanan & PIN'}
               </span>
+            </div>
+
+            <div className="flex items-center gap-1.5 shrink-0">
+              {onForceSyncCloud && (
+                <button
+                  onClick={onForceSyncCloud}
+                  disabled={isForceSyncing}
+                  title="Sinkronkan data dengan Cloud"
+                  className="flex items-center gap-1 px-2 py-1 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold border border-slate-200"
+                >
+                  <RefreshCw className={`w-3 h-3 text-emerald-600 ${isForceSyncing ? 'animate-spin' : ''}`} />
+                  <span className="text-[11px]">{isForceSyncing ? 'Sinkron...' : 'Sinkron'}</span>
+                </button>
+              )}
+
+              {activeTab === 'menus' && (
+                <button
+                  onClick={handleAddNewMenu}
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-xs"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span className="text-[11px]">Tambah</span>
+                </button>
+              )}
+
+              <button
+                onClick={onOpenPublicPreview}
+                title="Buka Halaman Pegawai"
+                className="p-1 rounded-md bg-white hover:bg-slate-50 text-slate-700 border border-slate-200"
+              >
+                <Eye className="w-3.5 h-3.5 text-indigo-600" />
+              </button>
+            </div>
+          </div>
+
+          {/* Navigation Tabs (Scrollable horizontal strip on mobile, flex on desktop) */}
+          <div className="w-full md:w-auto overflow-x-auto no-scrollbar scroll-smooth flex items-center gap-1 p-1 bg-slate-100/90 border border-slate-200 rounded-xl">
+            <button
+              onClick={() => setActiveTab('menus')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap shrink-0 transition-all ${
+                activeTab === 'menus'
+                  ? 'bg-indigo-600 text-white shadow-xs font-bold'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/70'
+              }`}
+            >
+              <LayoutGrid className="w-3.5 h-3.5" />
+              <span>Kelola Menu ({menus.length})</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('theme')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap shrink-0 transition-all ${
+                activeTab === 'theme'
+                  ? 'bg-indigo-600 text-white shadow-xs font-bold'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/70'
+              }`}
+            >
+              <Palette className="w-3.5 h-3.5" />
+              <span>Tema & Profil</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('employees')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap shrink-0 transition-all ${
+                activeTab === 'employees'
+                  ? 'bg-indigo-600 text-white shadow-xs font-bold'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/70'
+              }`}
+            >
+              <Users className="w-3.5 h-3.5" />
+              <span>Database Pegawai</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('analytics')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap shrink-0 transition-all ${
+                activeTab === 'analytics'
+                  ? 'bg-indigo-600 text-white shadow-xs font-bold'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/70'
+              }`}
+            >
+              <BarChart3 className="w-3.5 h-3.5" />
+              <span>Analitik Klik</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('wfa_monitoring')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap shrink-0 transition-all relative ${
+                activeTab === 'wfa_monitoring'
+                  ? 'bg-emerald-600 text-white shadow-xs font-bold'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/70'
+              }`}
+            >
+              <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Monitoring WFA</span>
+              {wfaSubmissions.filter(s => s.status === 'Menunggu Validasi').length > 0 && (
+                <span className="px-1.5 py-0.2 rounded-full bg-amber-500 text-slate-950 font-black text-[10px] animate-pulse">
+                  {wfaSubmissions.filter(s => s.status === 'Menunggu Validasi').length}
+                </span>
+              )}
+            </button>
+
+            <button
+              onClick={() => setActiveTab('kebugaran_monitoring')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap shrink-0 transition-all relative ${
+                activeTab === 'kebugaran_monitoring'
+                  ? 'bg-sky-600 text-white shadow-xs font-bold'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/70'
+              }`}
+            >
+              <Activity className="w-3.5 h-3.5 text-sky-400" />
+              <span>Monitoring Kebugaran</span>
+              <span className="px-1.5 py-0.2 rounded-full bg-sky-500 text-white font-black text-[10px]">
+                {kebugaranSubmissions.length}
+              </span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('export')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap shrink-0 transition-all ${
+                activeTab === 'export'
+                  ? 'bg-indigo-600 text-white shadow-xs font-bold'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/70'
+              }`}
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>Ekspor Data</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('security')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap shrink-0 transition-all ${
+                activeTab === 'security'
+                  ? 'bg-indigo-600 text-white shadow-xs font-bold'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/70'
+              }`}
+            >
+              <Lock className="w-3.5 h-3.5" />
+              <span>Keamanan & PIN</span>
+            </button>
+          </div>
+
+          {/* Desktop Action Controls */}
+          <div className="hidden md:flex items-center gap-2 shrink-0">
+            {onForceSyncCloud && (
+              <button
+                onClick={onForceSyncCloud}
+                disabled={isForceSyncing}
+                title="Sinkronkan data dengan Cloud"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium border border-slate-200 transition-colors shadow-xs disabled:opacity-50"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 text-emerald-600 ${isForceSyncing ? 'animate-spin' : ''}`} />
+                <span>{isForceSyncing ? 'Menyinkronkan...' : 'Sinkron Cloud'}</span>
+              </button>
             )}
-          </button>
 
-          <button
-            onClick={() => setActiveTab('kebugaran_monitoring')}
-            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-md text-xs font-medium transition-all relative ${
-              activeTab === 'kebugaran_monitoring'
-                ? 'bg-sky-600 text-white shadow-xs'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/70'
-            }`}
-          >
-            <Activity className="w-3.5 h-3.5 text-sky-400" />
-            <span>Monitoring Kebugaran</span>
-            <span className="px-1.5 py-0.2 rounded-full bg-sky-500 text-white font-black text-[10px]">
-              {kebugaranSubmissions.length}
-            </span>
-          </button>
+            <button
+              onClick={() => setShowLiveSidePreview(!showLiveSidePreview)}
+              className={`hidden xl:flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium border transition-all ${
+                showLiveSidePreview
+                  ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                  : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+              }`}
+            >
+              <Smartphone className="w-3.5 h-3.5" />
+              <span>Live Preview HP</span>
+            </button>
 
-          <button
-            onClick={() => setActiveTab('export')}
-            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-md text-xs font-medium transition-all ${
-              activeTab === 'export'
-                ? 'bg-indigo-600 text-white shadow-xs'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/70'
-            }`}
-          >
-            <Download className="w-3.5 h-3.5" />
-            <span>Ekspor Data</span>
-          </button>
+            <button
+              onClick={onOpenPublicPreview}
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-md bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium border border-slate-200 transition-colors shadow-xs"
+            >
+              <Eye className="w-3.5 h-3.5 text-indigo-600" />
+              <span>Buka Microsite Utama</span>
+            </button>
 
-          <button
-            onClick={() => setActiveTab('security')}
-            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-md text-xs font-medium transition-all ${
-              activeTab === 'security'
-                ? 'bg-indigo-600 text-white shadow-xs'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/70'
-            }`}
-          >
-            <Lock className="w-3.5 h-3.5" />
-            <span>Keamanan & PIN</span>
-          </button>
-        </div>
-
-        {/* Action Controls */}
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setShowLiveSidePreview(!showLiveSidePreview)}
-            className={`hidden xl:flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium border transition-all ${
-              showLiveSidePreview
-                ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
-                : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-            }`}
-          >
-            <Smartphone className="w-3.5 h-3.5" />
-            <span>Live Preview HP</span>
-          </button>
-
-          <button
-            onClick={onOpenPublicPreview}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-md bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium border border-slate-200 transition-colors shadow-xs"
-          >
-            <Eye className="w-3.5 h-3.5 text-indigo-600" />
-            <span>Buka Microsite Utama</span>
-          </button>
-
-          <button
-            onClick={handleAddNewMenu}
-            className="flex items-center gap-1.5 px-4 py-1.5 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium shadow-sm transition-all"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Tambah Menu</span>
-          </button>
+            <button
+              onClick={handleAddNewMenu}
+              className="flex items-center gap-1.5 px-4 py-1.5 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium shadow-sm transition-all"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Tambah Menu</span>
+            </button>
+          </div>
         </div>
       </header>
 
@@ -552,22 +619,23 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             {activeTab === 'menus' && (
               <div className="space-y-6">
                 {/* Header info banner */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 bg-white border border-slate-200 rounded-xl shadow-xs">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 sm:p-5 bg-white border border-slate-200 rounded-xl shadow-xs">
                   <div>
-                    <h2 className="text-base font-bold text-slate-900 tracking-tight">Daftar Tombol Direct Menu</h2>
+                    <h2 className="text-sm sm:text-base font-bold text-slate-900 tracking-tight">Daftar Tombol Direct Menu</h2>
                     <p className="text-xs text-slate-500 mt-0.5">
-                      Tarik & geser (drag-and-drop) untuk mengatur urutan tombol menu yang tampil di microsite.
+                      Gunakan tombol panah atau tarik & geser untuk mengatur urutan tombol menu di portal.
                     </p>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-slate-500 font-medium px-2.5 py-1 bg-slate-100 rounded-md border border-slate-200">
+                  <div className="flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto">
+                    <span className="text-xs text-slate-600 font-medium px-2.5 py-1 bg-slate-100 rounded-md border border-slate-200">
                       {menus.filter((m) => m.isActive).length} Aktif / {menus.length} Total
                     </span>
                     <button
                       onClick={handleAddNewMenu}
-                      className="px-3 py-1 rounded-md bg-indigo-50 text-indigo-600 border border-indigo-200 text-xs font-semibold hover:bg-indigo-100 transition-colors"
+                      className="px-3 py-1.5 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-xs flex items-center gap-1 transition-colors"
                     >
-                      + Tambah Menu
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Tambah Menu</span>
                     </button>
                   </div>
                 </div>
@@ -586,7 +654,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           onDragOver={(e) => handleDragOver(e, index)}
                           onDragEnd={handleDragEnd}
                           className={`
-                            group p-3.5 bg-white border rounded-xl transition-all duration-150
+                            group p-3 sm:p-3.5 bg-white border rounded-xl transition-all duration-150
                             ${
                               isDragging
                                 ? 'opacity-40 border-dashed border-indigo-500 scale-95 shadow-lg bg-indigo-50/50'
@@ -596,14 +664,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           `}
                         >
                           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                            {/* Left: Drag Handle, Icon, Title, Subtitle, Badges */}
-                            <div className="flex items-center gap-3 flex-1 min-w-0">
-                              {/* Drag Handle */}
-                              <div
-                                title="Tahan dan geser untuk memindahkan posisi"
-                                className="cursor-grab active:cursor-grabbing p-1.5 rounded-md text-slate-300 group-hover:text-slate-500 hover:bg-slate-100 transition-colors shrink-0"
-                              >
-                                <GripVertical className="w-5 h-5" />
+                            {/* Top / Left: Drag Handle, Icon, Title, Subtitle, Badges */}
+                            <div className="flex items-start sm:items-center gap-2.5 sm:gap-3 flex-1 min-w-0">
+                              {/* Position Badge & Drag Handle */}
+                              <div className="flex items-center gap-1 shrink-0">
+                                <span className="sm:hidden text-[10px] font-mono font-bold text-slate-400 w-5 text-center">
+                                  #{index + 1}
+                                </span>
+                                <div
+                                  title="Tahan dan geser untuk memindahkan posisi"
+                                  className="hidden sm:block cursor-grab active:cursor-grabbing p-1.5 rounded-md text-slate-300 group-hover:text-slate-500 hover:bg-slate-100 transition-colors shrink-0"
+                                >
+                                  <GripVertical className="w-5 h-5" />
+                                </div>
                               </div>
 
                               {/* Icon Box with Button Color Accent */}
@@ -614,15 +687,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                     : menu.bgColor,
                                   color: menu.textColor || '#ffffff',
                                 }}
-                                className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 shadow-xs overflow-hidden p-1.5"
+                                className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center shrink-0 shadow-xs overflow-hidden p-1.5"
                               >
-                                {getIconComponent(menu.iconName, 'w-full h-full max-w-[24px] max-h-[24px]')}
+                                {getIconComponent(menu.iconName, 'w-full h-full max-w-[22px] max-h-[22px] sm:max-w-[24px] sm:max-h-[24px]')}
                               </div>
 
                               {/* Title & Metadata */}
                               <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <h3 className="text-sm font-semibold text-slate-900 truncate">
+                                <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                                  <h3 className="text-sm font-bold sm:font-semibold text-slate-900 truncate max-w-[200px] sm:max-w-none">
                                     {menu.title}
                                   </h3>
                                   {menu.badgeText && (
@@ -631,41 +704,41 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                         backgroundColor: menu.badgeBgColor || '#f59e0b',
                                         color: menu.badgeTextColor || '#000',
                                       }}
-                                      className="text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider"
+                                      className="text-[9px] sm:text-[10px] font-bold px-1.5 py-0.2 rounded uppercase tracking-wider shrink-0"
                                     >
                                       {menu.badgeText}
                                     </span>
                                   )}
                                   {menu.category && (
-                                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
+                                    <span className="text-[9px] sm:text-[10px] px-1.5 py-0.2 rounded-full bg-slate-100 text-slate-600 border border-slate-200 shrink-0">
                                       {menu.category}
                                     </span>
                                   )}
                                   {menu.isProtected && (
                                     <span
                                       title={`Menu terproteksi PIN: ${menu.pinCode || 'Aktif'}`}
-                                      className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-300 flex items-center gap-1"
+                                      className="text-[9px] sm:text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-amber-50 text-amber-800 border border-amber-300 flex items-center gap-0.5 shrink-0"
                                     >
                                       <Lock className="w-2.5 h-2.5 text-amber-600" />
-                                      <span>PIN: {menu.pinCode || 'Aktif'}</span>
+                                      <span>PIN</span>
                                     </span>
                                   )}
                                 </div>
 
-                                <div className="flex items-center gap-3 text-xs text-slate-400 mt-0.5 flex-wrap">
-                                  <span className="truncate max-w-[220px] font-mono text-[11px] text-slate-500">
+                                <div className="flex items-center gap-2 sm:gap-3 text-xs text-slate-400 mt-0.5 flex-wrap">
+                                  <span className="truncate max-w-[170px] sm:max-w-[220px] font-mono text-[10px] sm:text-[11px] text-slate-500">
                                     {menu.url}
                                   </span>
-                                  <span className="font-mono text-indigo-600 text-[11px] font-semibold flex items-center gap-1">
-                                    <Zap className="w-3 h-3 text-amber-500" />
+                                  <span className="font-mono text-indigo-600 text-[10px] sm:text-[11px] font-semibold flex items-center gap-1">
+                                    <Zap className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-amber-500" />
                                     {menu.clickCount} klik
                                   </span>
                                 </div>
                               </div>
                             </div>
 
-                            {/* Right: Real-time Quick Size Selector & Actions */}
-                            <div className="flex items-center gap-1.5 self-end sm:self-center shrink-0 flex-wrap">
+                            {/* Desktop Controls (hidden on mobile, inline on desktop) */}
+                            <div className="hidden sm:flex items-center gap-1.5 self-end sm:self-center shrink-0 flex-wrap">
                               {/* Quick Size Switcher */}
                               <div className="flex items-center bg-slate-100 border border-slate-200 rounded-md p-0.5">
                                 {(
@@ -750,6 +823,97 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
                               </button>
+                            </div>
+                          </div>
+
+                          {/* Mobile Dedicated Action Controls (Clean, touch-friendly rows) */}
+                          <div className="sm:hidden flex flex-col gap-2 pt-2.5 mt-2 border-t border-slate-100 w-full">
+                            {/* Row 1: Size Switcher + Reorder Buttons */}
+                            <div className="flex items-center justify-between gap-2">
+                              {/* Size Selector */}
+                              <div className="flex items-center bg-slate-100 border border-slate-200 rounded-lg p-0.5">
+                                {(
+                                  [
+                                    { size: 'compact', label: 'C' },
+                                    { size: 'medium', label: 'M' },
+                                    { size: 'large', label: 'L' },
+                                    { size: 'featured', label: 'Hero' },
+                                  ] as const
+                                ).map((s) => (
+                                  <button
+                                    key={s.size}
+                                    onClick={() => handleQuickSizeChange(menu.id, s.size)}
+                                    className={`px-2.5 py-1 text-[11px] font-bold rounded-md transition-all ${
+                                      menu.size === s.size
+                                        ? 'bg-white text-indigo-600 shadow-xs font-black border border-slate-200'
+                                        : 'text-slate-500 hover:text-slate-900'
+                                    }`}
+                                  >
+                                    {s.label}
+                                  </button>
+                                ))}
+                              </div>
+
+                              {/* Up / Down Reorder */}
+                              <div className="flex items-center gap-1">
+                                <button
+                                  onClick={() => handleMove(index, 'up')}
+                                  disabled={index === 0}
+                                  title="Pindah ke Atas"
+                                  className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 disabled:opacity-30 rounded-lg border border-slate-200 active:bg-slate-300"
+                                >
+                                  <ArrowUp className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  onClick={() => handleMove(index, 'down')}
+                                  disabled={index === menus.length - 1}
+                                  title="Pindah ke Bawah"
+                                  className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 disabled:opacity-30 rounded-lg border border-slate-200 active:bg-slate-300"
+                                >
+                                  <ArrowDown className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Row 2: Status Toggle + Edit / Duplicate / Delete */}
+                            <div className="flex items-center justify-between gap-2 pt-1">
+                              {/* Status Toggle with Text */}
+                              <button
+                                onClick={() => handleToggleActive(menu.id)}
+                                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition-colors ${
+                                  menu.isActive
+                                    ? 'bg-green-50 text-green-700 border-green-200'
+                                    : 'bg-slate-100 text-slate-500 border-slate-200'
+                                }`}
+                              >
+                                {menu.isActive ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+                                <span>{menu.isActive ? 'Aktif' : 'Nonaktif'}</span>
+                              </button>
+
+                              {/* Action Buttons Group */}
+                              <div className="flex items-center gap-1.5">
+                                <button
+                                  onClick={() => handleEditMenu(menu)}
+                                  className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-semibold transition-colors"
+                                >
+                                  <Edit2 className="w-3.5 h-3.5" />
+                                  <span>Edit</span>
+                                </button>
+                                <button
+                                  onClick={() => handleDuplicateMenu(menu)}
+                                  title="Duplikat Menu"
+                                  className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 transition-colors"
+                                >
+                                  <Copy className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteMenu(menu.id)}
+                                  title="Hapus Menu"
+                                  className="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 transition-colors"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
                             </div>
                           </div>
                         </div>

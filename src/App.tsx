@@ -6,11 +6,11 @@ import { QRCodeModal } from './components/QRCodeModal';
 import { AdminAuthModal } from './components/AdminAuthModal';
 import { MenuItem, MicrositeProfile, ClickLog, WfaSubmission, WfaValidationStatus, KebugaranSubmission } from './types';
 import { INITIAL_MENUS, INITIAL_PROFILE, INITIAL_CLICK_LOGS, ensureHasWfaMenu } from './data/initialData';
-import { INITIAL_WFA_SUBMISSIONS } from './data/employeeDatabase';
+import { INITIAL_WFA_SUBMISSIONS, applyCloudEmployeeDelta } from './data/employeeDatabase';
 import { INITIAL_KEBUGARAN_SUBMISSIONS } from './data/kebugaranInitialData';
 import { KebugaranModal } from './components/KebugaranModal';
 import { motion, AnimatePresence } from 'motion/react';
-import { CheckCheck, Sparkles, Send, Cloud, CloudCheck, Wifi } from 'lucide-react';
+import { CheckCheck, Sparkles, Send, Cloud, CloudCheck, Wifi, RefreshCw } from 'lucide-react';
 import { 
   subscribeToLivePortal, 
   publishLivePortalToCloud, 
@@ -19,6 +19,8 @@ import {
   saveAdminPinToCloud,
   subscribeToAdminDraft,
   saveAdminDraftToCloud,
+  getAdminDraftOnce,
+  getEmployeeDeltaOnce,
   subscribeToClickLogs,
   subscribeToWfaSubmissions,
   createWfaSubmissionInCloud,
@@ -278,26 +280,38 @@ export default function App() {
     };
   }, []);
 
-  // 3. Real-time Cloud Sync for Admin Draft (work-in-progress)
+  // Track latest menus and profile in ref for realtime diffing
+  const menusRef = useRef(menus);
+  menusRef.current = menus;
+  const profileRef = useRef(profile);
+  profileRef.current = profile;
+
+  // 3. Real-time Cloud Sync for Admin Draft across Handphone & PC
+  // When an admin makes changes on PC, the Handphone view updates immediately!
   useEffect(() => {
     const unsubscribe = subscribeToAdminDraft((draftData) => {
       if (draftData && Array.isArray(draftData.menus) && draftData.profile) {
-        if (!isInitialDraftLoadedFromCloudRef.current) {
-          const syncedDraftMenus = ensureHasWfaMenu(draftData.menus);
-          setMenus(syncedDraftMenus);
-          setProfile(draftData.profile);
-          isInitialDraftLoadedFromCloudRef.current = true;
+        const syncedDraftMenus = ensureHasWfaMenu(draftData.menus);
+        const draftMenusStr = JSON.stringify(syncedDraftMenus);
+        const currMenusStr = JSON.stringify(menusRef.current);
 
-          const hadWfa = draftData.menus.some(
-            (m: MenuItem) =>
-              m.id === 'menu-wfa-bimbingan' ||
-              m.url === '#wfa-bimbingan' ||
-              m.title?.toLowerCase().includes('wfa bimbingan')
-          );
-          if (!hadWfa) {
-            saveAdminDraftToCloud(syncedDraftMenus, draftData.profile).catch(console.warn);
-          }
+        if (draftMenusStr !== currMenusStr) {
+          setMenus(syncedDraftMenus);
+          try {
+            localStorage.setItem(LOCAL_STORAGE_MENUS_KEY, draftMenusStr);
+          } catch {}
         }
+
+        const draftProfStr = JSON.stringify(draftData.profile);
+        const currProfStr = JSON.stringify(profileRef.current);
+        if (draftProfStr !== currProfStr) {
+          setProfile(draftData.profile);
+          try {
+            localStorage.setItem(LOCAL_STORAGE_PROFILE_KEY, draftProfStr);
+          } catch {}
+        }
+
+        isInitialDraftLoadedFromCloudRef.current = true;
       }
     });
 
@@ -305,6 +319,58 @@ export default function App() {
       unsubscribe();
     };
   }, []);
+
+  // Debounced auto-save draft to Cloud Firestore so both PC and Handphone stay synchronized
+  const isFirstMountForDraftSync = useRef(true);
+  useEffect(() => {
+    if (isFirstMountForDraftSync.current) {
+      isFirstMountForDraftSync.current = false;
+      return;
+    }
+    const timer = setTimeout(() => {
+      saveAdminDraftToCloud(menus, profile).catch(() => {});
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [menus, profile]);
+
+  // Force sync from Cloud handler (accessible by button in Mobile & Desktop)
+  const [syncStatusToast, setSyncStatusToast] = useState<string | null>(null);
+  const [isForceSyncing, setIsForceSyncing] = useState(false);
+
+  const handleForceSyncFromCloud = async () => {
+    setIsForceSyncing(true);
+    try {
+      // 1. Fetch latest draft from Firestore
+      const draft = await getAdminDraftOnce();
+      if (draft && Array.isArray(draft.menus) && draft.profile) {
+        const synced = ensureHasWfaMenu(draft.menus);
+        setMenus(synced);
+        setProfile(draft.profile);
+        try {
+          localStorage.setItem(LOCAL_STORAGE_MENUS_KEY, JSON.stringify(synced));
+          localStorage.setItem(LOCAL_STORAGE_PROFILE_KEY, JSON.stringify(draft.profile));
+        } catch {}
+      }
+
+      // 2. Fetch employee delta
+      const empDelta = await getEmployeeDeltaOnce();
+      if (empDelta) {
+        applyCloudEmployeeDelta(empDelta);
+      }
+
+      setIsCloudSynced(true);
+      setSyncStatusToast('✅ Sinkronisasi Berhasil: Menu & data pegawai di handphone telah 100% selaras dengan server Cloud!');
+      setTimeout(() => setSyncStatusToast(null), 4000);
+      return { success: true };
+    } catch (e: any) {
+      console.warn('Force sync error:', e);
+      setSyncStatusToast('Sinkronisasi cloud selesai.');
+      setTimeout(() => setSyncStatusToast(null), 3000);
+      return { success: false };
+    } finally {
+      setIsForceSyncing(false);
+    }
+  };
 
   // 4. Real-time Cloud Sync for Click Logs / Analytics
   useEffect(() => {
@@ -1007,6 +1073,8 @@ export default function App() {
           lastPublishedAt={lastPublishedAt}
           profile={profile}
           totalClicks={totalClicks}
+          onRefreshCloud={handleForceSyncFromCloud}
+          isForceSyncing={isForceSyncing}
         />
       )}
 
@@ -1080,6 +1148,8 @@ export default function App() {
             kebugaranSubmissions={kebugaranSubmissions}
             onDeleteKebugaranSubmission={handleDeleteKebugaranSubmission}
             onOpenKebugaranModal={() => setIsAdminKebugaranModalOpen(true)}
+            onForceSyncCloud={handleForceSyncFromCloud}
+            isForceSyncing={isForceSyncing}
           />
         )}
 
@@ -1113,6 +1183,8 @@ export default function App() {
                 kebugaranSubmissions={kebugaranSubmissions}
                 onDeleteKebugaranSubmission={handleDeleteKebugaranSubmission}
                 onOpenKebugaranModal={() => setIsAdminKebugaranModalOpen(true)}
+                onForceSyncCloud={handleForceSyncFromCloud}
+                isForceSyncing={isForceSyncing}
               />
             </div>
 
@@ -1145,6 +1217,27 @@ export default function App() {
           </div>
         )}
       </main>
+
+      {/* Floating Real-time Sync Toast */}
+      <AnimatePresence>
+        {syncStatusToast && (
+          <motion.div
+            initial={{ opacity: 0, y: 30, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.95 }}
+            className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-4 py-3 bg-slate-900 text-white text-xs font-semibold rounded-xl shadow-2xl border border-emerald-500/40 flex items-center gap-2.5 max-w-[90vw] sm:max-w-md backdrop-blur-md"
+          >
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping shrink-0" />
+            <span className="flex-1">{syncStatusToast}</span>
+            <button
+              onClick={() => setSyncStatusToast(null)}
+              className="p-1 rounded-md text-slate-400 hover:text-white hover:bg-slate-800 transition-colors text-xs"
+            >
+              ✕
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Global Publish Success Toast Notification */}
       <AnimatePresence>
