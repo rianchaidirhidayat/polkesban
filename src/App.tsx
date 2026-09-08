@@ -23,10 +23,12 @@ import {
   getEmployeeDeltaOnce,
   subscribeToClickLogs,
   subscribeToWfaSubmissions,
+  getWfaSubmissionsOnce,
   createWfaSubmissionInCloud,
   updateWfaStatusInCloud,
   deleteWfaSubmissionInCloud,
   subscribeToKebugaranSubmissions,
+  getKebugaranSubmissionsOnce,
   createKebugaranSubmissionInCloud,
   deleteKebugaranSubmissionInCloud
 } from './lib/firebase';
@@ -358,8 +360,26 @@ export default function App() {
         applyCloudEmployeeDelta(empDelta);
       }
 
+      // 3. Fetch latest WFA submissions directly from Firestore
+      const cloudWfa = await getWfaSubmissionsOnce();
+      if (Array.isArray(cloudWfa) && cloudWfa.length > 0) {
+        setWfaSubmissions(cloudWfa);
+        try {
+          localStorage.setItem(LOCAL_STORAGE_WFA_SUBMISSIONS_KEY, JSON.stringify(cloudWfa));
+        } catch {}
+      }
+
+      // 4. Fetch latest Kebugaran submissions directly from Firestore
+      const cloudKbg = await getKebugaranSubmissionsOnce();
+      if (Array.isArray(cloudKbg) && cloudKbg.length > 0) {
+        setKebugaranSubmissions(cloudKbg);
+        try {
+          localStorage.setItem(LOCAL_STORAGE_KEBUGARAN_SUBMISSIONS_KEY, JSON.stringify(cloudKbg));
+        } catch {}
+      }
+
       setIsCloudSynced(true);
-      setSyncStatusToast('✅ Sinkronisasi Berhasil: Menu & data pegawai di handphone telah 100% selaras dengan server Cloud!');
+      setSyncStatusToast('✅ Sinkronisasi Berhasil: Menu, data pegawai, pengajuan WFA, dan data kebugaran telah 100% selaras dan realtime!');
       setTimeout(() => setSyncStatusToast(null), 4000);
       return { success: true };
     } catch (e: any) {
@@ -577,6 +597,52 @@ export default function App() {
       // ignore
     }
   }, [kebugaranSubmissions]);
+
+  // Auto-sync any local-only pending submissions to Cloud Firestore (prevents data loss)
+  const isSyncingPendingRef = useRef(false);
+  useEffect(() => {
+    if (isSyncingPendingRef.current) return;
+    const unsyncedWfa = wfaSubmissions.filter((s) => s.id && s.id.startsWith('wfa-'));
+    const unsyncedKbg = kebugaranSubmissions.filter((s) => s.id && s.id.startsWith('kbg-'));
+
+    if (unsyncedWfa.length === 0 && unsyncedKbg.length === 0) return;
+
+    isSyncingPendingRef.current = true;
+    (async () => {
+      // Push unsynced WFA submissions to Cloud
+      for (const localSub of unsyncedWfa) {
+        try {
+          const { id, status, createdAt, ...rest } = localSub;
+          const res = await createWfaSubmissionInCloud(rest);
+          if (res.success && res.submission) {
+            setWfaSubmissions((prev) => [
+              res.submission!,
+              ...prev.filter((s) => s.id !== localSub.id && s.id !== res.submission!.id),
+            ]);
+          }
+        } catch (e) {
+          console.warn('Auto-sync WFA submission error:', e);
+        }
+      }
+
+      // Push unsynced Kebugaran submissions to Cloud
+      for (const localSub of unsyncedKbg) {
+        try {
+          const { id, createdAt, ...rest } = localSub;
+          const res = await createKebugaranSubmissionInCloud(rest);
+          if (res.success && res.submission) {
+            setKebugaranSubmissions((prev) => [
+              res.submission!,
+              ...prev.filter((s) => s.id !== localSub.id && s.id !== res.submission!.id),
+            ]);
+          }
+        } catch (e) {
+          console.warn('Auto-sync Kebugaran submission error:', e);
+        }
+      }
+      isSyncingPendingRef.current = false;
+    })();
+  }, [wfaSubmissions, kebugaranSubmissions]);
 
   // Ensure WFA & Kebugaran menus exist in menus & liveMenus
   useEffect(() => {

@@ -536,18 +536,19 @@ export async function createWfaSubmissionInCloud(
     const colRef = collection(db, WFA_COLLECTION);
     const now = new Date().toISOString();
     
-    const payload = sanitizeForFirestore({
-      ...submissionData,
+    const cleanData = sanitizeForFirestore(submissionData);
+    const payload = {
+      ...cleanData,
       status: 'Menunggu Validasi' as WfaValidationStatus,
       createdAt: now,
       serverTimestamp: serverTimestamp(),
-    });
+    };
 
     const docAdded = await addDoc(colRef, payload);
 
     const fullSubmission: WfaSubmission = {
       id: docAdded.id,
-      ...submissionData,
+      ...cleanData,
       status: 'Menunggu Validasi',
       createdAt: now,
     };
@@ -559,6 +560,52 @@ export async function createWfaSubmissionInCloud(
       success: false,
       error: err?.message || 'Gagal menyimpan pengajuan ke database server.',
     };
+  }
+}
+
+/**
+ * Fetch WFA submissions once directly from Cloud Firestore
+ */
+export async function getWfaSubmissionsOnce(): Promise<WfaSubmission[]> {
+  try {
+    const colRef = collection(db, WFA_COLLECTION);
+    const snapshot = await getDocs(colRef);
+    const list: WfaSubmission[] = [];
+    snapshot.forEach((docSnap) => {
+      const d = docSnap.data();
+      if (d && d.nip && d.tanggalWfa) {
+        list.push({
+          id: docSnap.id,
+          nip: String(d.nip).trim(),
+          employeeName: d.employeeName || '',
+          unitKerja: d.unitKerja || '',
+          jabatan: d.jabatan || '',
+          nomorWa: d.nomorWa || '',
+          tanggalWfa: String(d.tanggalWfa).trim(),
+          namaKegiatan: d.namaKegiatan || '',
+          lokasiKegiatan: d.lokasiKegiatan || 'Kota Bandung',
+          lokasiLahanBimbingan: d.lokasiLahanBimbingan || '',
+          statusWfa: d.statusWfa || 'WFA Datang',
+          linkSuratTugas: d.linkSuratTugas || '',
+          status: d.status || 'Menunggu Validasi',
+          catatanPengelola: d.catatanPengelola || '',
+          createdAt: d.createdAt || new Date().toISOString(),
+          validatedAt: d.validatedAt || undefined,
+          validatedBy: d.validatedBy || undefined,
+        });
+      }
+    });
+
+    list.sort((a, b) => {
+      const timeA = new Date(a.createdAt || 0).getTime();
+      const timeB = new Date(b.createdAt || 0).getTime();
+      return timeB - timeA;
+    });
+
+    return list;
+  } catch (e) {
+    console.warn('Failed to fetch WFA submissions once:', e);
+    return [];
   }
 }
 
@@ -578,7 +625,6 @@ export async function updateWfaStatusInCloud(
     const updates: Record<string, any> = {
       status,
       catatanPengelola: catatanPengelola || '',
-      updatedAt: serverTimestamp(),
     };
 
     if (status === 'Valid' || status === 'Ditolak') {
@@ -589,7 +635,11 @@ export async function updateWfaStatusInCloud(
       updates.validatedBy = null;
     }
 
-    await updateDoc(docRef, sanitizeForFirestore(updates));
+    const cleanUpdates = sanitizeForFirestore(updates);
+    await updateDoc(docRef, {
+      ...cleanUpdates,
+      updatedAt: serverTimestamp(),
+    });
     return { success: true };
   } catch (err: any) {
     console.error('Failed to update WFA status in Cloud Firestore:', err);
@@ -685,6 +735,59 @@ export function subscribeToKebugaranSubmissions(
 }
 
 /**
+ * Fetch Kebugaran Submissions once directly from Cloud Firestore
+ */
+export async function getKebugaranSubmissionsOnce(): Promise<KebugaranSubmission[]> {
+  try {
+    const colRef = collection(db, KEBUGARAN_COLLECTION);
+    const snapshot = await getDocs(colRef);
+    if (snapshot.empty) {
+      return INITIAL_KEBUGARAN_SUBMISSIONS;
+    }
+
+    const list: KebugaranSubmission[] = [];
+    snapshot.forEach((docSnap) => {
+      const d = docSnap.data();
+      if (d) {
+        list.push({
+          id: docSnap.id,
+          tanggalPeriksa: d.tanggalPeriksa || '',
+          periode: d.periode || 'Triwulan I',
+          nip: d.nip || '',
+          namaPegawai: d.namaPegawai || '',
+          tanggalLahir: d.tanggalLahir || '',
+          unitKerja: d.unitKerja || '',
+          nik: d.nik || '',
+          tensiSistolik: Number(d.tensiSistolik) || 120,
+          tensiDiastolik: Number(d.tensiDiastolik) || 80,
+          beratBadan: Number(d.beratBadan) || 60,
+          tinggiBadan: Number(d.tinggiBadan) || 160,
+          lingkarPinggang: Number(d.lingkarPinggang) || 75,
+          tipeGulaDarah: d.tipeGulaDarah || 'GDS',
+          gulaDarah: Number(d.gulaDarah) || 100,
+          kolesterol: Number(d.kolesterol) || 180,
+          nomorWa: d.nomorWa || '',
+          fasyankes: d.fasyankes || 'Klinik Pratama Poltekkes Kemenkes Bandung',
+          catatan: d.catatan || '',
+          createdAt: d.createdAt || new Date().toISOString(),
+        });
+      }
+    });
+
+    list.sort((a, b) => {
+      const timeA = new Date(a.createdAt || 0).getTime();
+      const timeB = new Date(b.createdAt || 0).getTime();
+      return timeB - timeA;
+    });
+
+    return list;
+  } catch (e) {
+    console.warn('Failed to fetch Kebugaran submissions once:', e);
+    return [];
+  }
+}
+
+/**
  * Create new Kebugaran Submission in Cloud Firestore
  */
 export async function createKebugaranSubmissionInCloud(
@@ -694,17 +797,18 @@ export async function createKebugaranSubmissionInCloud(
     const colRef = collection(db, KEBUGARAN_COLLECTION);
     const now = new Date().toISOString();
 
-    const payload = sanitizeForFirestore({
-      ...submissionData,
+    const cleanData = sanitizeForFirestore(submissionData);
+    const payload = {
+      ...cleanData,
       createdAt: now,
       serverTimestamp: serverTimestamp(),
-    });
+    };
 
     const docAdded = await addDoc(colRef, payload);
 
     const fullSubmission: KebugaranSubmission = {
       id: docAdded.id,
-      ...submissionData,
+      ...cleanData,
       createdAt: now,
     };
 
