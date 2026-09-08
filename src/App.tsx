@@ -141,11 +141,19 @@ export default function App() {
     return INITIAL_WFA_SUBMISSIONS;
   });
 
-  // Kebugaran Jasmani Submissions state
+  // Kebugaran Jasmani Submissions state (Reset Triwulan I, II, IV; only Triwulan III)
   const [kebugaranSubmissions, setKebugaranSubmissions] = useState<KebugaranSubmission[]>(() => {
     try {
       const saved = localStorage.getItem(LOCAL_STORAGE_KEBUGARAN_SUBMISSIONS_KEY);
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed: KebugaranSubmission[] = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const onlyTriwulan3 = parsed.filter((item) => item.periode === 'Triwulan III');
+          if (onlyTriwulan3.length > 0) {
+            return onlyTriwulan3;
+          }
+        }
+      }
     } catch {
       // ignore
     }
