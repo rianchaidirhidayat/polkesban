@@ -190,17 +190,6 @@ export default function App() {
             localStorage.setItem(LOCAL_STORAGE_MENUS_KEY, JSON.stringify(syncedMenus));
             localStorage.setItem(LOCAL_STORAGE_PROFILE_KEY, JSON.stringify(cloudData.profile));
           } catch {}
-
-          // If cloud data was missing the WFA menu, auto-update the live portal in Cloud Firestore
-          const hadWfa = cloudData.menus.some(
-            (m: MenuItem) =>
-              m.id === 'menu-wfa-bimbingan' ||
-              m.url === '#wfa-bimbingan' ||
-              m.title?.toLowerCase().includes('wfa bimbingan')
-          );
-          if (!hadWfa) {
-            publishLivePortalToCloud(syncedMenus, cloudData.profile).catch(console.warn);
-          }
         }
       },
       (err) => {
@@ -208,9 +197,8 @@ export default function App() {
       },
       async () => {
         // Cloud document doesn't exist yet on Firestore!
-        // Automatically seed with current menus and profile so any employee opening the link sees it immediately.
+        // Seed initial portal live data to Cloud Firestore once
         try {
-          console.log('Seeding initial portal live data to Cloud Firestore...');
           await publishLivePortalToCloud(menus, profile);
           setIsCloudSynced(true);
         } catch (e) {
