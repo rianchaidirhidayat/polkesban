@@ -11,18 +11,27 @@ export async function optimizeImageForStorage(
   maxHeight = 160,
   quality = 0.85
 ): Promise<string> {
-  // If it's a standard icon name or emoji, return as-is immediately
+  // If it's a standard icon name or emoji, or if it's already a compact data URI (< 50KB), return as-is immediately
   if (typeof source === 'string') {
     if (!source.startsWith('data:image/') && !source.startsWith('blob:')) {
+      return source;
+    }
+    // If already reasonably compact (< 60KB), don't waste time re-compressing
+    if (source.length < 80000) {
       return source;
     }
   }
 
   return new Promise((resolve) => {
+    let timeoutId: any = setTimeout(() => {
+      resolve(typeof source === 'string' ? source : '');
+    }, 2500);
+
     const img = new Image();
     img.crossOrigin = 'anonymous';
 
     img.onload = () => {
+      clearTimeout(timeoutId);
       try {
         let { width, height } = img;
         if (width <= 0 || height <= 0) {
@@ -48,13 +57,12 @@ export async function optimizeImageForStorage(
         }
 
         ctx.imageSmoothingEnabled = true;
-        ctx.imageSmoothingQuality = 'high';
+        ctx.imageSmoothingQuality = 'medium';
         ctx.drawImage(img, 0, 0, width, height);
 
-        // Try WebP first for optimal compression (typically 70% smaller than PNG)
         let output = canvas.toDataURL('image/webp', quality);
         if (!output.startsWith('data:image/webp')) {
-          output = canvas.toDataURL('image/png');
+          output = canvas.toDataURL('image/jpeg', quality);
         }
 
         resolve(output);
@@ -65,6 +73,7 @@ export async function optimizeImageForStorage(
     };
 
     img.onerror = () => {
+      clearTimeout(timeoutId);
       resolve(typeof source === 'string' ? source : '');
     };
 
@@ -76,10 +85,14 @@ export async function optimizeImageForStorage(
         if (e.target?.result) {
           img.src = e.target.result as string;
         } else {
+          clearTimeout(timeoutId);
           resolve('');
         }
       };
-      reader.onerror = () => resolve('');
+      reader.onerror = () => {
+        clearTimeout(timeoutId);
+        resolve('');
+      };
       reader.readAsDataURL(source);
     }
   });
