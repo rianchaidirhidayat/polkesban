@@ -679,16 +679,23 @@ export function subscribeToKebugaranSubmissions(
     const colRef = collection(db, KEBUGARAN_COLLECTION);
     return onSnapshot(
       colRef,
-      (snapshot) => {
+      async (snapshot) => {
         if (snapshot.empty) {
           onUpdate(INITIAL_KEBUGARAN_SUBMISSIONS);
+          // Auto-seed to Cloud Firestore so all devices and future fetches have all 76 records
+          try {
+            INITIAL_KEBUGARAN_SUBMISSIONS.forEach(async (item) => {
+              const docRef = doc(db, KEBUGARAN_COLLECTION, item.id);
+              await setDoc(docRef, sanitizeForFirestore(item), { merge: true });
+            });
+          } catch {}
           return;
         }
 
         const list: KebugaranSubmission[] = [];
         snapshot.forEach((docSnap) => {
           const d = docSnap.data();
-          if (d) {
+          if (d && (d.nip || d.namaPegawai)) {
             list.push({
               id: docSnap.id,
               tanggalPeriksa: d.tanggalPeriksa || '',
@@ -714,6 +721,14 @@ export function subscribeToKebugaranSubmissions(
           }
         });
 
+        // If cloud collection has fewer documents than baseline (e.g. only a few were uploaded), merge with initial
+        const existingIds = new Set(list.map(s => s.id));
+        INITIAL_KEBUGARAN_SUBMISSIONS.forEach(initItem => {
+          if (!existingIds.has(initItem.id)) {
+            list.push(initItem);
+          }
+        });
+
         // In-memory sorting by createdAt descending
         list.sort((a, b) => {
           const timeA = new Date(a.createdAt || 0).getTime();
@@ -735,20 +750,27 @@ export function subscribeToKebugaranSubmissions(
 }
 
 /**
- * Fetch Kebugaran Submissions once directly from Cloud Firestore
+ * Fetch Kebugaran Submissions once directly from Cloud Firestore with guaranteed fallback
  */
 export async function getKebugaranSubmissionsOnce(): Promise<KebugaranSubmission[]> {
   try {
     const colRef = collection(db, KEBUGARAN_COLLECTION);
     const snapshot = await getDocs(colRef);
     if (snapshot.empty) {
+      // Auto-seed to Cloud Firestore
+      try {
+        INITIAL_KEBUGARAN_SUBMISSIONS.forEach(async (item) => {
+          const docRef = doc(db, KEBUGARAN_COLLECTION, item.id);
+          await setDoc(docRef, sanitizeForFirestore(item), { merge: true });
+        });
+      } catch {}
       return INITIAL_KEBUGARAN_SUBMISSIONS;
     }
 
     const list: KebugaranSubmission[] = [];
     snapshot.forEach((docSnap) => {
       const d = docSnap.data();
-      if (d) {
+      if (d && (d.nip || d.namaPegawai)) {
         list.push({
           id: docSnap.id,
           tanggalPeriksa: d.tanggalPeriksa || '',
@@ -774,6 +796,14 @@ export async function getKebugaranSubmissionsOnce(): Promise<KebugaranSubmission
       }
     });
 
+    // Merge missing initial baseline items so 76+ data is never lost
+    const existingIds = new Set(list.map(s => s.id));
+    INITIAL_KEBUGARAN_SUBMISSIONS.forEach(initItem => {
+      if (!existingIds.has(initItem.id)) {
+        list.push(initItem);
+      }
+    });
+
     list.sort((a, b) => {
       const timeA = new Date(a.createdAt || 0).getTime();
       const timeB = new Date(b.createdAt || 0).getTime();
@@ -783,7 +813,22 @@ export async function getKebugaranSubmissionsOnce(): Promise<KebugaranSubmission
     return list;
   } catch (e) {
     console.warn('Failed to fetch Kebugaran submissions once:', e);
-    return [];
+    return INITIAL_KEBUGARAN_SUBMISSIONS;
+  }
+}
+
+/**
+ * Bulk sync Kebugaran submissions to Cloud Firestore
+ */
+export async function syncAllKebugaranSubmissionsToCloud(submissions: KebugaranSubmission[]): Promise<void> {
+  if (!Array.isArray(submissions) || submissions.length === 0) return;
+  try {
+    for (const item of submissions) {
+      const docRef = doc(db, KEBUGARAN_COLLECTION, item.id);
+      await setDoc(docRef, sanitizeForFirestore(item), { merge: true });
+    }
+  } catch (err) {
+    console.warn('Bulk sync kebugaran error:', err);
   }
 }
 
