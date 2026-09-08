@@ -95,23 +95,6 @@ export function subscribeToLivePortal(
 }
 
 /**
- * Fetch the live published portal data once from Cloud Firestore
- */
-export async function getLivePortalOnce(): Promise<LivePortalData | null> {
-  try {
-    const docRef = doc(db, 'portal', LIVE_PORTAL_DOC);
-    const snap = await getDoc(docRef);
-    if (snap.exists()) {
-      return snap.data() as LivePortalData;
-    }
-    return null;
-  } catch (err) {
-    console.warn('Failed to fetch live portal once:', err);
-    return null;
-  }
-}
-
-/**
  * Helper to downscale and optimize heavy base64 images inside menus and profile
  */
 async function optimizePortalPayload(menus: MenuItem[], profile: MicrositeProfile) {
@@ -350,7 +333,21 @@ export function subscribeToClickLogs(
   }
 }
 
-
+/**
+ * Load initial portal state once
+ */
+export async function getLivePortalOnce(): Promise<LivePortalData | null> {
+  try {
+    const docRef = doc(db, 'portal', LIVE_PORTAL_DOC);
+    const snap = await getDoc(docRef);
+    if (snap.exists()) {
+      return snap.data() as LivePortalData;
+    }
+  } catch (e) {
+    console.warn('Failed to fetch portal doc:', e);
+  }
+  return null;
+}
 
 const WFA_COLLECTION = 'wfa_submissions';
 
@@ -430,14 +427,7 @@ export async function createWfaSubmissionInCloud(
       serverTimestamp: serverTimestamp(),
     });
 
-    const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('Cloud sync timeout (offline or slow connection)')), 4000)
-    );
-
-    const docAdded = (await Promise.race([
-      addDoc(colRef, payload),
-      timeoutPromise,
-    ])) as any;
+    const docAdded = await addDoc(colRef, payload);
 
     const fullSubmission: WfaSubmission = {
       id: docAdded.id,
@@ -524,72 +514,56 @@ export function subscribeToKebugaranSubmissions(
     return onSnapshot(
       colRef,
       (snapshot) => {
-        let deletedIds: string[] = [];
-        try {
-          const stored = localStorage.getItem('direct_menu_kebugaran_deleted_ids');
-          if (stored) deletedIds = JSON.parse(stored);
-        } catch {}
+        if (snapshot.empty) {
+          onUpdate(INITIAL_KEBUGARAN_SUBMISSIONS);
+          return;
+        }
 
-        const listMap = new Map<string, KebugaranSubmission>();
-
-        // 1. Always seed with all 76 CSV initial submissions
-        INITIAL_KEBUGARAN_SUBMISSIONS.forEach((item) => {
-          if (!deletedIds.includes(item.id)) {
-            listMap.set(item.id, item);
+        const list: KebugaranSubmission[] = [];
+        snapshot.forEach((docSnap) => {
+          const d = docSnap.data();
+          if (d) {
+            list.push({
+              id: docSnap.id,
+              tanggalPeriksa: d.tanggalPeriksa || '',
+              periode: d.periode || 'Triwulan I',
+              nip: d.nip || '',
+              namaPegawai: d.namaPegawai || '',
+              tanggalLahir: d.tanggalLahir || '',
+              unitKerja: d.unitKerja || '',
+              nik: d.nik || '',
+              tensiSistolik: Number(d.tensiSistolik) || 120,
+              tensiDiastolik: Number(d.tensiDiastolik) || 80,
+              beratBadan: Number(d.beratBadan) || 60,
+              tinggiBadan: Number(d.tinggiBadan) || 160,
+              lingkarPinggang: Number(d.lingkarPinggang) || 75,
+              tipeGulaDarah: d.tipeGulaDarah || 'GDS',
+              gulaDarah: Number(d.gulaDarah) || 100,
+              kolesterol: Number(d.kolesterol) || 180,
+              nomorWa: d.nomorWa || '',
+              fasyankes: d.fasyankes || 'Klinik Pratama Poltekkes Kemenkes Bandung',
+              catatan: d.catatan || '',
+              createdAt: d.createdAt || new Date().toISOString(),
+            });
           }
         });
 
-        // 2. Overlay / append Cloud Firestore submissions
-        if (!snapshot.empty) {
-          snapshot.forEach((docSnap) => {
-            const d = docSnap.data();
-            if (d && !deletedIds.includes(docSnap.id)) {
-              listMap.set(docSnap.id, {
-                id: docSnap.id,
-                tanggalPeriksa: d.tanggalPeriksa || '',
-                periode: d.periode || 'Triwulan III',
-                nip: d.nip || '',
-                namaPegawai: d.namaPegawai || '',
-                tanggalLahir: d.tanggalLahir || '',
-                unitKerja: d.unitKerja || '',
-                nik: d.nik || '',
-                tensiSistolik: Number(d.tensiSistolik) || 120,
-                tensiDiastolik: Number(d.tensiDiastolik) || 80,
-                beratBadan: Number(d.beratBadan) || 60,
-                tinggiBadan: Number(d.tinggiBadan) || 160,
-                lingkarPinggang: Number(d.lingkarPinggang) || 75,
-                tipeGulaDarah: d.tipeGulaDarah || 'GDS',
-                gulaDarah: Number(d.gulaDarah) || 100,
-                kolesterol: Number(d.kolesterol) || 180,
-                nomorWa: d.nomorWa || '',
-                fasyankes: d.fasyankes || 'Klinik Pratama Poltekkes Kemenkes Bandung',
-                catatan: d.catatan || '',
-                createdAt: d.createdAt || new Date().toISOString(),
-              });
-            }
-          });
-        }
-
-        const merged = Array.from(listMap.values());
-
         // In-memory sorting by createdAt descending
-        merged.sort((a, b) => {
-          const timeA = new Date(a.createdAt || a.tanggalPeriksa || 0).getTime();
-          const timeB = new Date(b.createdAt || b.tanggalPeriksa || 0).getTime();
+        list.sort((a, b) => {
+          const timeA = new Date(a.createdAt || 0).getTime();
+          const timeB = new Date(b.createdAt || 0).getTime();
           return timeB - timeA;
         });
 
-        onUpdate(merged);
+        onUpdate(list);
       },
       (err) => {
         console.warn('Firestore kebugaran_submissions subscription error:', err);
         if (onError) onError(err);
-        onUpdate(INITIAL_KEBUGARAN_SUBMISSIONS);
       }
     );
   } catch (e) {
     console.warn('Failed to setup kebugaran_submissions listener:', e);
-    onUpdate(INITIAL_KEBUGARAN_SUBMISSIONS);
     return () => {};
   }
 }
@@ -610,14 +584,7 @@ export async function createKebugaranSubmissionInCloud(
       serverTimestamp: serverTimestamp(),
     });
 
-    const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('Cloud sync timeout (offline or slow connection)')), 4000)
-    );
-
-    const docAdded = (await Promise.race([
-      addDoc(colRef, payload),
-      timeoutPromise,
-    ])) as any;
+    const docAdded = await addDoc(colRef, payload);
 
     const fullSubmission: KebugaranSubmission = {
       id: docAdded.id,

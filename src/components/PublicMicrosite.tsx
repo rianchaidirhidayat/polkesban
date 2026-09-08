@@ -20,8 +20,7 @@ import {
   Mail,
   ShieldCheck,
   ExternalLink,
-  Lock,
-  RefreshCw
+  Lock
 } from 'lucide-react';
 import { WfaBimbinganModal } from './WfaBimbinganModal';
 import { KebugaranModal } from './KebugaranModal';
@@ -35,7 +34,6 @@ interface PublicMicrositeProps {
   onOpenAdmin?: () => void;
   isStandalone?: boolean;
   lastPublishedAt?: string | null;
-  onRefresh?: () => void;
   wfaSubmissions?: WfaSubmission[];
   onSubmitWfa?: (submission: Omit<WfaSubmission, 'id' | 'status' | 'createdAt'>) => Promise<{ success: boolean; error?: string }>;
   kebugaranSubmissions?: KebugaranSubmission[];
@@ -50,7 +48,6 @@ export const PublicMicrosite: React.FC<PublicMicrositeProps> = ({
   onOpenAdmin,
   isStandalone = false,
   lastPublishedAt,
-  onRefresh,
   wfaSubmissions = [],
   onSubmitWfa,
   kebugaranSubmissions = [],
@@ -61,17 +58,6 @@ export const PublicMicrosite: React.FC<PublicMicrositeProps> = ({
   const [pinModalMenu, setPinModalMenu] = useState<MenuItem | null>(null);
   const [isWfaModalOpen, setIsWfaModalOpen] = useState<boolean>(false);
   const [isKebugaranModalOpen, setIsKebugaranModalOpen] = useState<boolean>(false);
-  const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
-
-  const handleRefreshClick = async () => {
-    if (!onRefresh) return;
-    setIsRefreshing(true);
-    try {
-      await onRefresh();
-    } finally {
-      setTimeout(() => setIsRefreshing(false), 600);
-    }
-  };
 
   const theme = profile.theme;
 
@@ -312,23 +298,13 @@ export const PublicMicrosite: React.FC<PublicMicrositeProps> = ({
       <div className="w-full max-w-xl mx-auto flex flex-col items-center relative z-10">
         {/* Floating Share and QR Quick Actions */}
         <div className="w-full flex items-center justify-between gap-2 mb-4 px-1">
-          <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/40 border border-white/10 backdrop-blur-md text-[11px] text-neutral-300 font-medium shadow-sm">
+          <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/40 border border-white/10 backdrop-blur-md text-[11px] text-neutral-300 font-medium">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping inline-block mr-0.5" />
             <span className="w-2 h-2 rounded-full bg-emerald-500 absolute" />
-            <span>Live • {profile.footerBadgeText ? profile.footerBadgeText.split('•')[0].trim() : 'Portal Layanan Pegawai'}</span>
+            {profile.footerBadgeText ? profile.footerBadgeText.split('•')[0].trim() : 'Portal Layanan Pegawai'}
           </div>
 
           <div className="flex items-center gap-2">
-            {onRefresh && (
-              <button
-                onClick={handleRefreshClick}
-                disabled={isRefreshing}
-                title="Muat ulang dan sinkronkan data terbaru dari server"
-                className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-white border border-white/10 backdrop-blur-md transition-all shadow-sm hover:scale-105 active:scale-95 disabled:opacity-60"
-              >
-                <RefreshCw className={`w-4 h-4 text-emerald-300 ${isRefreshing ? 'animate-spin' : ''}`} />
-              </button>
-            )}
             <button
               onClick={onOpenQR}
               title="Tampilkan QR Code"

@@ -83,7 +83,6 @@ interface AdminDashboardProps {
   onPublish?: () => void;
   isPublishing?: boolean;
   lastPublishedAt?: string | null;
-  onPullFromCloud?: () => Promise<{ success: boolean; error?: string }>;
   wfaSubmissions?: WfaSubmission[];
   onUpdateWfaStatus?: (id: string, status: WfaValidationStatus, notes?: string) => Promise<{ success: boolean; error?: string }>;
   onDeleteWfaSubmission?: (id: string) => Promise<{ success: boolean; error?: string }>;
@@ -113,7 +112,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   onPublish,
   isPublishing = false,
   lastPublishedAt,
-  onPullFromCloud,
   wfaSubmissions = [],
   onUpdateWfaStatus,
   onDeleteWfaSubmission,
@@ -133,8 +131,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [isLogoDragging, setIsLogoDragging] = useState(false);
   const [isFaviconDragging, setIsFaviconDragging] = useState(false);
   const [copiedShareLink, setCopiedShareLink] = useState(false);
-  const [isPullingCloud, setIsPullingCloud] = useState(false);
-  const [cloudPullToast, setCloudPullToast] = useState<string | null>(null);
 
   // Auto publish toggle (defaults to true for zero-friction employee sync)
   const [autoPublishEnabled, setAutoPublishEnabled] = useState<boolean>(() => {
@@ -174,28 +170,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
     const timer = setTimeout(() => {
       onPublish();
-    }, 1200);
+    }, 1800);
 
     return () => clearTimeout(timer);
   }, [autoPublishEnabled, hasUnpublishedChanges, onPublish, isPublishing]);
-
-  const handlePullFromCloudAction = async () => {
-    if (!onPullFromCloud) return;
-    setIsPullingCloud(true);
-    try {
-      const res = await onPullFromCloud();
-      if (res.success) {
-        setCloudPullToast('Berhasil memuat data live terbaru dari Cloud Firestore!');
-      } else {
-        setCloudPullToast(`Gagal: ${res.error || 'Tidak dapat terhubung'}`);
-      }
-    } catch (e: any) {
-      setCloudPullToast(`Gagal: ${e?.message || 'Error koneksi'}`);
-    } finally {
-      setIsPullingCloud(false);
-      setTimeout(() => setCloudPullToast(null), 3500);
-    }
-  };
 
   const handleCopyShareLink = () => {
     try {
@@ -459,45 +437,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
         {/* Action Controls */}
         <div className="flex items-center gap-2">
-          {/* Tombol Posting / Publikasikan ke Cloud */}
-          {onPublish && (
-            <button
-              onClick={onPublish}
-              disabled={isPublishing}
-              title="Posting dan publikasikan perubahan sekarang ke seluruh HP/perangkat pegawai"
-              className={`flex items-center gap-1.5 px-3.5 sm:px-4 py-1.5 rounded-md text-xs font-bold transition-all shadow-sm ${
-                hasUnpublishedChanges
-                  ? 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white animate-pulse shadow-emerald-800/40 ring-2 ring-emerald-400/50 hover:scale-[1.02] active:scale-95'
-                  : 'bg-emerald-700 hover:bg-emerald-600 text-white'
-              }`}
-            >
-              {isPublishing ? (
-                <>
-                  <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  <span>Memposting...</span>
-                </>
-              ) : (
-                <>
-                  <Send className="w-3.5 h-3.5" />
-                  <span>{hasUnpublishedChanges ? '🚀 Posting Perubahan' : '✅ Sudah Terposting'}</span>
-                </>
-              )}
-            </button>
-          )}
-
-          {/* Tombol Tarik / Sinkronkan dari Cloud */}
-          {onPullFromCloud && (
-            <button
-              onClick={handlePullFromCloudAction}
-              disabled={isPullingCloud}
-              title="Tarik data live terbaru dari Cloud Firestore ke draft editor ini"
-              className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium border border-slate-300 transition-colors shadow-2xs disabled:opacity-60"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 text-indigo-600 ${isPullingCloud ? 'animate-spin' : ''}`} />
-              <span>{isPullingCloud ? 'Menyinkronkan...' : 'Sinkron Cloud'}</span>
-            </button>
-          )}
-
           <button
             onClick={() => setShowLiveSidePreview(!showLiveSidePreview)}
             className={`hidden xl:flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium border transition-all ${
@@ -572,25 +511,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </div>
                 <p className="text-xs text-slate-600 mt-1 max-w-2xl">
                   {hasUnpublishedChanges
-                    ? 'Terdapat perubahan draft yang belum tayang di HP pegawai. Klik tombol "Posting Sekarang" untuk langsung mempublikasikannya ke Cloud Firestore secara realtime.'
-                    : 'Semua perubahan menu dan profil kustom Anda sudah aktif di Cloud Firestore. Setiap pegawai yang membuka link akan langsung melihat tampilan ini secara realtime.'}
+                    ? 'Terdapat perubahan yang belum diposting. Tekan tombol "Posting / Update Portal" pada bilah atas untuk langsung mempublikasikannya ke seluruh pegawai.'
+                    : 'Semua perubahan menu dan profil kustom Anda sudah aktif di Cloud Firestore. Setiap pegawai yang membuka link akan langsung melihat tampilan ini.'}
                 </p>
               </div>
             </div>
 
             {/* Actions & Auto-publish switch */}
             <div className="flex flex-wrap items-center gap-2.5 pt-2 lg:pt-0 border-t lg:border-t-0 border-slate-200/60">
-              {onPublish && hasUnpublishedChanges && (
-                <button
-                  onClick={onPublish}
-                  disabled={isPublishing}
-                  className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold shadow-md hover:scale-[1.02] active:scale-95 transition-all"
-                >
-                  <Send className="w-3.5 h-3.5" />
-                  <span>{isPublishing ? 'Sedang Memposting...' : 'Posting Sekarang'}</span>
-                </button>
-              )}
-
               <label
                 className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/80 border border-slate-200 text-xs text-slate-700 cursor-pointer hover:bg-white shadow-2xs transition-colors"
                 title="Jika aktif, setiap perubahan yang Anda lakukan otomatis langsung tersimpan ke Cloud untuk pegawai"
@@ -2632,42 +2560,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           >
             <Check className="w-4 h-4 text-emerald-400" />
             <span>Perubahan tersimpan otomatis!</span>
-          </motion.div>
-        )}
-
-        {/* Cloud Pull toast */}
-        {cloudPullToast && (
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 30 }}
-            className="fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-2.5 bg-slate-900 text-white rounded-lg shadow-xl font-medium text-xs border border-indigo-500/40"
-          >
-            <RefreshCw className="w-4 h-4 text-indigo-400 animate-spin" />
-            <span>{cloudPullToast}</span>
-          </motion.div>
-        )}
-
-        {/* Floating Quick Publish Pill when unpublished changes exist */}
-        {hasUnpublishedChanges && onPublish && !saveToast && !cloudPullToast && (
-          <motion.div
-            initial={{ opacity: 0, y: 30, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 30, scale: 0.95 }}
-            className="fixed bottom-6 right-6 z-40 bg-slate-900/95 backdrop-blur-md text-white p-2.5 sm:px-4 rounded-2xl shadow-2xl border border-amber-400/40 flex items-center gap-3"
-          >
-            <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping" />
-              <span className="text-xs font-semibold text-amber-200 hidden sm:inline">Ada perubahan belum live</span>
-            </div>
-            <button
-              onClick={onPublish}
-              disabled={isPublishing}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 text-xs font-black shadow-md transition-transform active:scale-95"
-            >
-              <Send className="w-3.5 h-3.5" />
-              <span>{isPublishing ? 'Memposting...' : 'Posting Sekarang'}</span>
-            </button>
           </motion.div>
         )}
       </AnimatePresence>

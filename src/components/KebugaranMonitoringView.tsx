@@ -59,7 +59,7 @@ export const KebugaranMonitoringView: React.FC<KebugaranMonitoringViewProps> = (
   const [activeSubTab, setActiveSubTab] = useState<'sudah' | 'belum'>('sudah');
 
   // Filters
-  const [periodeFilter, setPeriodeFilter] = useState<string>('Triwulan III');
+  const [periodeFilter, setPeriodeFilter] = useState<string>('Semua Periode');
   const [unitFilter, setUnitFilter] = useState<string>('Semua Unit');
   const [searchQuery, setSearchQuery] = useState<string>('');
 

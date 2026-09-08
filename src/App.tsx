@@ -12,8 +12,7 @@ import { KebugaranModal } from './components/KebugaranModal';
 import { motion, AnimatePresence } from 'motion/react';
 import { CheckCheck, Sparkles, Send, Cloud, CloudCheck, Wifi } from 'lucide-react';
 import { 
-  subscribeToLivePortal,
-  getLivePortalOnce, 
+  subscribeToLivePortal, 
   publishLivePortalToCloud, 
   logClickToCloud,
   subscribeToAdminSecurity,
@@ -142,32 +141,11 @@ export default function App() {
     return INITIAL_WFA_SUBMISSIONS;
   });
 
-  // Kebugaran Jasmani Submissions state (76 records from CSV + Cloud synchronization)
+  // Kebugaran Jasmani Submissions state
   const [kebugaranSubmissions, setKebugaranSubmissions] = useState<KebugaranSubmission[]>(() => {
     try {
-      let deletedIds: string[] = [];
-      const deletedStored = localStorage.getItem('direct_menu_kebugaran_deleted_ids');
-      if (deletedStored) deletedIds = JSON.parse(deletedStored);
-
-      const map = new Map<string, KebugaranSubmission>();
-      INITIAL_KEBUGARAN_SUBMISSIONS.forEach((item) => {
-        if (!deletedIds.includes(item.id)) {
-          map.set(item.id, item);
-        }
-      });
-
       const saved = localStorage.getItem(LOCAL_STORAGE_KEBUGARAN_SUBMISSIONS_KEY);
-      if (saved) {
-        const parsed: KebugaranSubmission[] = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          parsed.forEach((item) => {
-            if (!deletedIds.includes(item.id)) {
-              map.set(item.id, item);
-            }
-          });
-        }
-      }
-      return Array.from(map.values());
+      if (saved) return JSON.parse(saved);
     } catch {
       // ignore
     }
@@ -663,24 +641,17 @@ export default function App() {
   const handleCreateKebugaranSubmission = async (data: Omit<KebugaranSubmission, 'id' | 'createdAt'>) => {
     // Duplicate rejection: Pegawai tidak boleh mengisi formulir kebugaran pada periode yang sama dua kali
     const cleanNip = data.nip.replace(/[\s.-]/g, '').trim();
-    const cleanNik = data.nik ? data.nik.replace(/[\s.-]/g, '').trim() : '';
     const cleanPeriode = data.periode.trim();
 
     const isDuplicate = kebugaranSubmissions.some((sub) => {
-      const subNip = sub.nip ? sub.nip.replace(/[\s.-]/g, '').trim() : '';
-      const subNik = sub.nik ? sub.nik.replace(/[\s.-]/g, '').trim() : '';
-      const samePeriode = sub.periode.toLowerCase() === cleanPeriode.toLowerCase();
-
-      const nipMatch = cleanNip && subNip && subNip === cleanNip;
-      const nikMatch = cleanNik && subNik && subNik === cleanNik;
-
-      return samePeriode && (nipMatch || nikMatch);
+      const subNip = sub.nip.replace(/[\s.-]/g, '').trim();
+      return subNip === cleanNip && sub.periode.toLowerCase() === cleanPeriode.toLowerCase();
     });
 
     if (isDuplicate) {
       return {
         success: false,
-        error: `Penginputan Ditolak: Pegawai atas nama ${data.namaPegawai} (NIP: ${data.nip}) sudah terdata pada ${data.periode}. Sistem secara otomatis menolak pengisian ganda (duplikat) dalam satu periode triwulan yang sama.`,
+        error: `Data Ditolak: Pegawai dengan NIP ${data.nip} (${data.namaPegawai}) sudah terdaftar mengisi formulir data kebugaran untuk ${data.periode}. Setiap pegawai hanya mengisi 1 kali per periode triwulan.`,
       };
     }
 
@@ -723,16 +694,6 @@ export default function App() {
   };
 
   const handleDeleteKebugaranSubmission = async (id: string) => {
-    // Record deleted ID
-    try {
-      const stored = localStorage.getItem('direct_menu_kebugaran_deleted_ids');
-      const deletedIds: string[] = stored ? JSON.parse(stored) : [];
-      if (!deletedIds.includes(id)) {
-        deletedIds.push(id);
-        localStorage.setItem('direct_menu_kebugaran_deleted_ids', JSON.stringify(deletedIds));
-      }
-    } catch {}
-
     // 1. Optimistic local delete
     setKebugaranSubmissions((prev) => {
       const filtered = prev.filter((s) => s.id !== id);
@@ -942,33 +903,6 @@ export default function App() {
     }
   };
 
-  // Force Pull/Sync directly from Cloud Firestore
-  const handleForceSyncFromCloud = async () => {
-    try {
-      const cloudData = await getLivePortalOnce();
-      if (cloudData && Array.isArray(cloudData.menus) && cloudData.profile) {
-        const syncedMenus = ensureHasWfaMenu(cloudData.menus);
-        setLiveMenus(syncedMenus);
-        setLiveProfile(cloudData.profile);
-        setMenus(syncedMenus);
-        setProfile(cloudData.profile);
-        if (cloudData.lastPublishedAt) setLastPublishedAt(cloudData.lastPublishedAt);
-        setIsCloudSynced(true);
-        try {
-          localStorage.setItem(LOCAL_STORAGE_LIVE_MENUS_KEY, JSON.stringify(syncedMenus));
-          localStorage.setItem(LOCAL_STORAGE_LIVE_PROFILE_KEY, JSON.stringify(cloudData.profile));
-          localStorage.setItem(LOCAL_STORAGE_MENUS_KEY, JSON.stringify(syncedMenus));
-          localStorage.setItem(LOCAL_STORAGE_PROFILE_KEY, JSON.stringify(cloudData.profile));
-        } catch {}
-        return { success: true };
-      }
-      return { success: false, error: 'Data di Cloud Firestore masih kosong' };
-    } catch (err: any) {
-      console.warn('Force sync from cloud error:', err);
-      return { success: false, error: err?.message || 'Gagal terhubung ke Cloud Firestore' };
-    }
-  };
-
   // Click tracking event dispatcher
   const handleMenuClick = (clickedMenu: MenuItem) => {
     // 1. Increment menu click count in both draft and live
@@ -1104,7 +1038,6 @@ export default function App() {
               }}
               isStandalone={true}
               lastPublishedAt={lastPublishedAt}
-              onRefresh={handleForceSyncFromCloud}
               wfaSubmissions={wfaSubmissions}
               onSubmitWfa={handleCreateWfaSubmission}
               kebugaranSubmissions={kebugaranSubmissions}
@@ -1134,18 +1067,11 @@ export default function App() {
             onPublish={handlePublishLive}
             isPublishing={isPublishing}
             lastPublishedAt={lastPublishedAt}
-            onPullFromCloud={handleForceSyncFromCloud}
             wfaSubmissions={wfaSubmissions}
             onUpdateWfaStatus={handleUpdateWfaStatus}
             onDeleteWfaSubmission={handleDeleteWfaSubmission}
             kebugaranSubmissions={kebugaranSubmissions}
             onDeleteKebugaranSubmission={handleDeleteKebugaranSubmission}
-            onRefreshKebugaran={() => {
-              try {
-                localStorage.removeItem('direct_menu_kebugaran_deleted_ids');
-              } catch {}
-              setKebugaranSubmissions(INITIAL_KEBUGARAN_SUBMISSIONS);
-            }}
             onOpenKebugaranModal={() => setIsAdminKebugaranModalOpen(true)}
           />
         )}
@@ -1174,18 +1100,11 @@ export default function App() {
                 onPublish={handlePublishLive}
                 isPublishing={isPublishing}
                 lastPublishedAt={lastPublishedAt}
-                onPullFromCloud={handleForceSyncFromCloud}
                 wfaSubmissions={wfaSubmissions}
                 onUpdateWfaStatus={handleUpdateWfaStatus}
                 onDeleteWfaSubmission={handleDeleteWfaSubmission}
                 kebugaranSubmissions={kebugaranSubmissions}
                 onDeleteKebugaranSubmission={handleDeleteKebugaranSubmission}
-                onRefreshKebugaran={() => {
-                  try {
-                    localStorage.removeItem('direct_menu_kebugaran_deleted_ids');
-                  } catch {}
-                  setKebugaranSubmissions(INITIAL_KEBUGARAN_SUBMISSIONS);
-                }}
                 onOpenKebugaranModal={() => setIsAdminKebugaranModalOpen(true)}
               />
             </div>
