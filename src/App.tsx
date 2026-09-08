@@ -340,15 +340,95 @@ export default function App() {
   useEffect(() => {
     if (isFirstMountForDraftSync.current) {
       isFirstMountForDraftSync.current = false;
-      // Publish current configuration on initial mount so cloud database is always up-to-date
-      publishLivePortalToCloud(menus, profile).catch(() => {});
       return;
     }
     const timer = setTimeout(() => {
       publishLivePortalToCloud(menus, profile).catch(() => {});
-    }, 1200);
+      saveAdminDraftToCloud(menus, profile).catch(() => {});
+    }, 600);
     return () => clearTimeout(timer);
   }, [menus, profile]);
+
+  // Initial immediate fetch on mount to guarantee fresh cloud state
+  useEffect(() => {
+    const fetchImmediateInitialData = async () => {
+      try {
+        const [cloudPortal, cloudDraft, cloudWfa, cloudKbg] = await Promise.all([
+          getLivePortalOnce(),
+          getAdminDraftOnce(),
+          getWfaSubmissionsOnce(),
+          getKebugaranSubmissionsOnce()
+        ]);
+
+        const chosenPortal = cloudPortal || cloudDraft;
+        if (chosenPortal && Array.isArray(chosenPortal.menus) && chosenPortal.profile) {
+          const syncedMenus = ensureHasWfaMenu(chosenPortal.menus);
+          setLiveMenus(syncedMenus);
+          setLiveProfile(chosenPortal.profile);
+          setMenus(syncedMenus);
+          setProfile(chosenPortal.profile);
+          try {
+            localStorage.setItem(LOCAL_STORAGE_LIVE_MENUS_KEY, JSON.stringify(syncedMenus));
+            localStorage.setItem(LOCAL_STORAGE_LIVE_PROFILE_KEY, JSON.stringify(chosenPortal.profile));
+            localStorage.setItem(LOCAL_STORAGE_MENUS_KEY, JSON.stringify(syncedMenus));
+            localStorage.setItem(LOCAL_STORAGE_PROFILE_KEY, JSON.stringify(chosenPortal.profile));
+          } catch {}
+        }
+
+        if (Array.isArray(cloudWfa) && cloudWfa.length > 0) {
+          setWfaSubmissions(cloudWfa);
+          try {
+            localStorage.setItem(LOCAL_STORAGE_WFA_SUBMISSIONS_KEY, JSON.stringify(cloudWfa));
+          } catch {}
+        }
+
+        if (Array.isArray(cloudKbg) && cloudKbg.length > 0) {
+          setKebugaranSubmissions(cloudKbg);
+          try {
+            localStorage.setItem(LOCAL_STORAGE_KEBUGARAN_SUBMISSIONS_KEY, JSON.stringify(cloudKbg));
+          } catch {}
+        }
+      } catch (err) {
+        console.warn('Initial one-time cloud fetch error:', err);
+      }
+    };
+
+    fetchImmediateInitialData();
+  }, []);
+
+  // Handler for refreshing WFA submissions
+  const handleRefreshWfa = async () => {
+    try {
+      const cloudWfa = await getWfaSubmissionsOnce();
+      if (Array.isArray(cloudWfa)) {
+        setWfaSubmissions(cloudWfa);
+        try {
+          localStorage.setItem(LOCAL_STORAGE_WFA_SUBMISSIONS_KEY, JSON.stringify(cloudWfa));
+        } catch {}
+        setSyncStatusToast(`✅ Data WFA Bimbingan berhasil diperbarui (${cloudWfa.length} data pengajuan)`);
+        setTimeout(() => setSyncStatusToast(null), 3500);
+      }
+    } catch (e) {
+      console.warn('Refresh WFA error:', e);
+    }
+  };
+
+  // Handler for refreshing Kebugaran submissions
+  const handleRefreshKebugaran = async () => {
+    try {
+      const cloudKbg = await getKebugaranSubmissionsOnce();
+      if (Array.isArray(cloudKbg)) {
+        setKebugaranSubmissions(cloudKbg);
+        try {
+          localStorage.setItem(LOCAL_STORAGE_KEBUGARAN_SUBMISSIONS_KEY, JSON.stringify(cloudKbg));
+        } catch {}
+        setSyncStatusToast(`✅ Data Tes Kebugaran Pegawai berhasil diperbarui (${cloudKbg.length} data periksa)`);
+        setTimeout(() => setSyncStatusToast(null), 3500);
+      }
+    } catch (e) {
+      console.warn('Refresh Kebugaran error:', e);
+    }
+  };
 
   // Force sync from Cloud handler (accessible by button in Mobile & Desktop)
   const [syncStatusToast, setSyncStatusToast] = useState<string | null>(null);
@@ -1232,8 +1312,10 @@ export default function App() {
             wfaSubmissions={wfaSubmissions}
             onUpdateWfaStatus={handleUpdateWfaStatus}
             onDeleteWfaSubmission={handleDeleteWfaSubmission}
+            onRefreshWfa={handleRefreshWfa}
             kebugaranSubmissions={kebugaranSubmissions}
             onDeleteKebugaranSubmission={handleDeleteKebugaranSubmission}
+            onRefreshKebugaran={handleRefreshKebugaran}
             onOpenKebugaranModal={() => setIsAdminKebugaranModalOpen(true)}
             onForceSyncCloud={handleForceSyncFromCloud}
             isForceSyncing={isForceSyncing}
@@ -1267,8 +1349,10 @@ export default function App() {
                 wfaSubmissions={wfaSubmissions}
                 onUpdateWfaStatus={handleUpdateWfaStatus}
                 onDeleteWfaSubmission={handleDeleteWfaSubmission}
+                onRefreshWfa={handleRefreshWfa}
                 kebugaranSubmissions={kebugaranSubmissions}
                 onDeleteKebugaranSubmission={handleDeleteKebugaranSubmission}
+                onRefreshKebugaran={handleRefreshKebugaran}
                 onOpenKebugaranModal={() => setIsAdminKebugaranModalOpen(true)}
                 onForceSyncCloud={handleForceSyncFromCloud}
                 isForceSyncing={isForceSyncing}

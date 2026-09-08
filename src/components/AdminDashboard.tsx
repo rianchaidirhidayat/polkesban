@@ -167,14 +167,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
   }, [menus, profile, liveMenus, liveProfile]);
 
-  // Debounced auto-publish effect when autoPublishEnabled is true
+  // Debounced auto-publish effect when autoPublishEnabled is true (Ultra-responsive 500ms sync)
   React.useEffect(() => {
     if (!autoPublishEnabled || !onPublish || isPublishing) return;
     if (!hasUnpublishedChanges) return;
 
     const timer = setTimeout(() => {
       onPublish();
-    }, 1800);
+    }, 500);
 
     return () => clearTimeout(timer);
   }, [autoPublishEnabled, hasUnpublishedChanges, onPublish, isPublishing]);
